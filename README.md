@@ -58,10 +58,10 @@ No **primeiro acesso** com a conta da loja, o sistema grava sozinho o cardápio 
 **GitHub Pages** (grátis, o repositório é público):
 
 1. No GitHub: repositório `Amarilis-restobar` → *Settings* → *Pages* → *Build and deployment*: **Deploy from a branch**, branch **`main`**, pasta **`/ (root)`** → *Save*.
-2. Em 1 ou 2 minutos o sistema fica em `https://sistema-elitemkt.github.io/amarilis-restobar/`.
+2. Em 1 ou 2 minutos o sistema fica em `https://sistema-elitemkt.github.io/Amarilis-restobar/`.
 3. No Firebase → Authentication → Configurações → **Domínios autorizados**, confira se `sistema-elitemkt.github.io` está na lista.
 
-- Cardápio do cliente: `https://sistema-elitemkt.github.io/amarilis-restobar/#/cardapio` (link e QR Code em Caixa > Ajustes).
+- Cardápio do cliente: `https://sistema-elitemkt.github.io/Amarilis-restobar/#/cardapio` (link e QR Code em Caixa > Ajustes).
 - **Domínio próprio depois:** crie o arquivo `CNAME` com o domínio, aponte o DNS para o GitHub Pages e adicione o domínio em *Domínios autorizados* no Firebase.
 - **Regras do banco:** sempre que `firestore.rules` mudar, cole o conteúdo de novo no console do Firebase (Firestore → Regras → Publicar).
 
