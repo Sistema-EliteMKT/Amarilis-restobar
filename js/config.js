@@ -10,10 +10,10 @@
 //    os dados ficam só neste navegador (abas do mesmo computador se falam).
 //    Veja o README.md para o passo a passo de como preencher.
 export const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  appId: "",
+  apiKey: "AIzaSyAaGj0o4y41Gu4oaCPEa_uBbDozAwtp4xs",
+  authDomain: "amarilis-restobar.firebaseapp.com",
+  projectId: "amarilis-restobar",
+  appId: "1:422008903328:web:608bdde7b78188334c5bc5",
 };
 
 // 2) MARCA DO SISTEMA (aparece em todas as telas e no fim de cada cupom)
