@@ -1,5 +1,5 @@
 // App do garçom: mesas, comandas pelo número do cartão e lançamento de itens.
-import { $, $$, esc, brl, hora, toast, erro, pedirTexto, confirmar, abrirSheet, fecharSheet, cabecalhoSheet, rodapeMarca } from "../ui.js";
+import { $, $$, esc, brl, hora, toast, erro, pedirTexto, confirmar, abrirSheet, fecharSheet, cabecalhoSheet, rodapeMarca, tempoDesde } from "../ui.js";
 import { D, loja, aoMudar, situacaoMesa, comandasDaMesa, comandaAberta, abrirComanda, lancarItens, pedirConta, imprimirConta, subtotal, trocarMesa, rotuloComanda, cancelarItem, cancelarComanda, baseServico } from "../regras.js";
 import { seletorProdutos, linhaItem } from "./seletor.js";
 import { editarItem, editarLancado } from "./item.js";
@@ -36,7 +36,7 @@ export function telaGarcom(raiz, usuario, sair) {
       <div class="legenda"><span class="m-livre">Livre</span><span class="m-ocupada">Ocupada</span><span class="m-conta">Pediu a conta</span></div>
       <div class="mesas">${Array.from({ length: n }, (_, i) => {
         const m = i + 1, s = situacaoMesa(m);
-        return `<button class="mesa m-${s.status}" data-m="${m}"><b>${m}</b><small>${s.status === "livre" ? "Livre" : s.status === "conta" ? "Conta" : brl(s.total)}</small></button>`;
+        return `<button class="mesa m-${s.status}" data-m="${m}"><b>${m}</b><small>${s.status === "livre" ? "Livre" : s.status === "conta" ? "Conta" : brl(s.total)}</small>${s.status === "livre" ? "" : `<em>${tempoDesde(s.desde)}</em>`}</button>`;
       }).join("")}</div>${rodapeMarca()}</div>`;
     ligarTopo();
     $$("[data-m]", raiz).forEach((b) => (b.onclick = () => { V.mesa = +b.dataset.m; desenhar(); }));

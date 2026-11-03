@@ -1,5 +1,5 @@
 // Painel do caixa: pedidos (entrega/retirada/balcão), mesas, motoboys, resumo, impressoras, cardápio e ajustes.
-import { $, $$, esc, brl, hora, minutos, toast, erro, bip, pedirTexto, confirmar, buscaNaLista, abrirSheet, fecharSheet, cabecalhoSheet, rodapeMarca, numero } from "../ui.js";
+import { $, $$, esc, brl, hora, minutos, toast, erro, bip, pedirTexto, confirmar, buscaNaLista, abrirSheet, fecharSheet, cabecalhoSheet, rodapeMarca, numero, icone, tempoDesde } from "../ui.js";
 import {
   D, loja, aoMudar, ETAPAS, situacaoMesa, comandasDaMesa, subtotal, totalPedido, itensValidos, tituloPedido,
   criarPedido, aceitarPedido, mudarEtapa, cancelarPedido, concluirPedido, cancelarItem, cancelarComanda, moverItem,
@@ -25,7 +25,7 @@ const ABAS = [
 const TIPO = { entrega: "Delivery", retirada: "Retirada", balcao: "Balcão" };
 
 export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
-  let aba = sessionStorage.getItem("se_aba") || "pedidos";
+  let aba = sessionStorage.getItem("se_aba") || "mesas"; // restobar: o salão é o principal
   const vistos = new Set();
   let primeira = true;
   const admin = usuario.papel === "admin";
@@ -54,15 +54,22 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
     if (!raiz.dataset.pronto) {
       raiz.dataset.pronto = "1";
       const lj = loja();
-      raiz.innerHTML = `<header class="p-top"><div class="p-top-in">
-          <div class="p-loja">${lj.logo ? `<img src="${esc(lj.logo)}" alt="${esc(lj.nome)}">` : `<b>${esc(lj.nome)}</b>`}<span class="muted">${new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}</span></div>
-          <div class="p-quem"><button class="btn pri sm" id="novo">+ Novo pedido</button><button class="btn ghost sm" id="abrirMesa">+ Criar comanda</button><button class="btn ghost sm" id="garcom">Modo garçom</button>
-            <span class="caixa-on"><i></i>${esc(usuario.nome)}</span><button class="btn ghost sm" id="sair">Sair</button></div>
-        </div></header>
-        <div class="p-wrap" id="avisoImp"></div>
-        <nav class="p-tabs chips" id="abas"></nav>
-        <main class="p-wrap" id="corpo"></main>
-        <div class="p-wrap">${rodapeMarca()}</div>`;
+      raiz.innerHTML = `<div class="cx">
+        <aside class="cx-side">
+          <div class="cx-logo">${lj.logo ? `<img src="${esc(lj.logo)}" alt="${esc(lj.nome)}">` : `<b>${esc(lj.nome)}</b>`}</div>
+          <nav class="cx-nav" id="abas" aria-label="Seções do caixa"></nav>
+          <div class="cx-user"><span class="cx-avatar">${esc((usuario.nome || "?").trim().charAt(0).toUpperCase())}</span><span class="cx-quem"><b>${esc(usuario.nome)}</b><small>${admin ? "Administrador" : "Caixa"}</small></span>
+            <button class="cx-sair" id="sair" title="Sair" aria-label="Sair">${icone("sair")}</button></div>
+        </aside>
+        <div class="cx-main">
+          <header class="cx-top">
+            <div class="cx-tit"><h1 id="tituloAba"></h1><span class="cx-data">${(() => { const d = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }); return d.charAt(0).toUpperCase() + d.slice(1); })()} · <b id="relogioCx"></b></span></div>
+            <div class="cx-acoes"><button class="btn pri" id="novo">${icone("mais")}Novo pedido</button><button class="btn ghost" id="abrirMesa">${icone("mesas")}Abrir mesa</button><button class="btn ghost" id="garcom">${icone("celular")}Modo garçom</button></div>
+          </header>
+          <div id="avisoImp"></div>
+          <main class="cx-corpo" id="corpo"></main>
+          ${rodapeMarca()}
+        </div></div>`;
       $("#sair", raiz).onclick = sair;
       $("#garcom", raiz).onclick = modoGarcom;
       $("#novo", raiz).onclick = () => novoPedido();
@@ -81,7 +88,8 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
     };
     avisoImpressora();
     $("#abas", raiz).innerHTML = ABAS.filter(([k]) => admin || k !== "ajustes")
-      .map(([k, l]) => `<button class="chip" data-aba="${k}" aria-pressed="${aba === k}">${l}${cont[k] ? `<span class="badge">${cont[k]}</span>` : ""}</button>`).join("");
+      .map(([k, l]) => `<button class="cx-item" data-aba="${k}" aria-pressed="${aba === k}">${icone(k)}<span>${l}</span>${cont[k] ? `<span class="badge">${cont[k]}</span>` : ""}</button>`).join("");
+    const t = $("#tituloAba", raiz); if (t) t.textContent = (ABAS.find(([k]) => k === aba) || ABAS[0])[1];
     $$("[data-aba]", raiz).forEach((b) => (b.onclick = () => { aba = b.dataset.aba; sessionStorage.setItem("se_aba", aba); atualizarAbas(); atualizarAba(); }));
   };
 
@@ -131,10 +139,10 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
     const n = Number(loja().nMesas) || 0;
     const ocup = new Set(D.abertos.filter((p) => p.tipo === "mesa").map((p) => p.mesa)).size;
     const rua = new Set(D.abertos.filter((p) => p.status === "saiu" && p.motoboy?.id).map((p) => p.motoboy.id)).size;
-    return `<div class="kpis"><div class="kpi"><b>${brl(vendido)}</b><span>vendido hoje</span></div>
-      <div class="kpi"><b>${andamento}</b><span>pedidos em andamento</span></div>
-      <div class="kpi"><b>${ocup}/${n}</b><span>mesas ocupadas</span></div>
-      <div class="kpi"><b>${rua}</b><span>motoboys na rua</span></div></div>`;
+    return `<div class="kpis"><div class="kpi k1">${icone("dinheiro")}<b>${brl(vendido)}</b><span>vendido hoje</span></div>
+      <div class="kpi k2">${icone("pedidos")}<b>${andamento}</b><span>delivery, retirada e balcão</span></div>
+      <div class="kpi k3">${icone("mesas")}<b>${ocup}<small>/${n}</small></b><span>mesas ocupadas</span><i class="kpi-barra"><i style="width:${n ? Math.round((ocup / n) * 100) : 0}%"></i></i></div>
+      <div class="kpi k4">${icone("motoboys")}<b>${rua}</b><span>motoboys na rua</span></div></div>`;
   };
 
   function abaPedidos(el) {
@@ -452,25 +460,47 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
   }
 
   // -------------------------------------------------------------------- Mesas
+  let filtroMesa = "todas";
   function abaMesas(el) {
     const n = Number(loja().nMesas) || 0;
     const qm = sem(buscaMesa.trim());
-    const todas = Array.from({ length: n }, (_, i) => ({ m: i + 1, ...situacaoMesa(i + 1) })).filter((s) => s.status !== "livre");
+    const tudo = Array.from({ length: n }, (_, i) => ({ m: i + 1, ...situacaoMesa(i + 1) }));
+    const todas = tudo.filter((s) => s.status !== "livre");
     const oc = todas.filter((s) => !qm || String(s.m) === qm.replace(/^mesa\s*/, "") || s.comandas.some((c) => casaPedido(c, qm)))
+      .filter((s) => filtroMesa !== "conta" || s.status === "conta")
       .sort((a, b) => (b.status === "conta") - (a.status === "conta") || a.desde - b.desde);
-    el.innerHTML = `<div class="kpis"><div class="kpi"><b>${todas.length}/${n}</b><span>mesas ocupadas</span></div>
-      <div class="kpi"><b>${brl(todas.reduce((s, m) => s + m.total, 0))}</b><span>em comandas abertas</span></div>
-      <div class="kpi"><b>${todas.filter((m) => m.status === "conta").length}</b><span>pedindo a conta</span></div></div>
+    const pedindo = todas.filter((m) => m.status === "conta").length;
+    const pessoas = todas.reduce((s, m) => s + (m.pessoas || 0), 0);
+    const noFiltro = (s) => filtroMesa === "todas" || (filtroMesa === "livres" ? s.status === "livre" : filtroMesa === "conta" ? s.status === "conta" : s.status !== "livre");
+    // Mapa do salão: todas as mesas de uma vez. Mesa livre abre comanda; ocupada abre as comandas dela.
+    const mapa = tudo.filter(noFiltro).map((s) => {
+      const min = s.desde ? Math.round((Date.now() - s.desde) / 60000) : 0;
+      return `<button class="sm-mesa st-${s.status} ${s.status === "ocupada" && min >= 120 ? "demora" : ""}" data-mp="${s.m}" title="${s.status === "livre" ? `Mesa ${s.m} livre: abrir comanda` : `Mesa ${s.m}: ver comandas`}">
+        <span class="sm-n">${s.m}</span>
+        ${s.status === "livre" ? `<span class="sm-l">Livre</span>` : `<span class="sm-v">${brl(s.total)}</span><span class="sm-t">${icone("relogio", "ic mini")}${tempoDesde(s.desde)}${s.pessoas ? ` · ${s.pessoas}p` : ""}</span>${s.status === "conta" ? `<span class="sm-tag">Conta</span>` : ""}`}
+        ${s.status !== "livre" && s.comandas[0]?.garcom ? `<span class="sm-g">${esc(s.comandas[0].garcom)}</span>` : ""}</button>`;
+    }).join("");
+    el.innerHTML = `<div class="kpis"><div class="kpi k3">${icone("mesas")}<b>${todas.length}<small>/${n}</small></b><span>mesas ocupadas</span><i class="kpi-barra"><i style="width:${n ? Math.round((todas.length / n) * 100) : 0}%"></i></i></div>
+      <div class="kpi k1">${icone("dinheiro")}<b>${brl(todas.reduce((s, m) => s + m.total, 0))}</b><span>em comandas abertas</span></div>
+      <div class="kpi k4 ${pedindo ? "chama" : ""}">${icone("sino")}<b>${pedindo}</b><span>pedindo a conta</span></div>
+      <div class="kpi k2">${icone("pessoas")}<b>${pessoas}</b><span>pessoas no salão</span></div></div>
+      <section class="salao"><div class="salao-h"><h2>Salão</h2>
+        <div class="seg salao-f" role="group" aria-label="Filtrar mesas">${[["todas", "Todas"], ["abertas", "Abertas"], ["conta", "Conta"], ["livres", "Livres"]].map(([v, l]) => `<button data-fm="${v}" aria-pressed="${filtroMesa === v}">${l}</button>`).join("")}</div></div>
+        <div class="legenda"><span class="m-livre">Livre</span><span class="m-ocupada">Aberta</span><span class="m-conta">Pediu a conta</span><span class="m-demora">Aberta há mais de 2h</span></div>
+        <div class="salao-grade">${mapa || `<p class="vazio">Nenhuma mesa neste filtro.</p>`}</div></section>
+      <div class="salao-h"><h2>Comandas abertas</h2></div>
       <div class="busca-ped"><input class="in" id="buscaMesa" type="search" placeholder="🔎 Buscar mesa, comanda ou nome do cliente" value="${esc(buscaMesa)}" aria-label="Buscar mesa"></div>
       <div class="grade-mesas">${oc.map((s) => `<article class="card mesa-card ${s.status === "conta" ? "conta" : ""}">
         <div class="card-h"><b class="mc-t">Mesa ${s.m}</b><span class="pill ${s.status === "conta" ? "bad" : "st-ocupada"}">${s.status === "conta" ? "Pediu a conta" : "Aberta"}</span></div>
-        <small class="muted">${esc(s.comandas[0].garcom || "")} · desde ${hora(s.desde)}${s.pessoas ? ` · ${s.pessoas} ${s.pessoas > 1 ? "pessoas" : "pessoa"}` : ""} · ${s.comandas.length} ${s.comandas.length > 1 ? "comandas" : "comanda"}</small>
+        <small class="muted">${esc(s.comandas[0].garcom || "")} · desde ${hora(s.desde)} (${tempoDesde(s.desde)})${s.pessoas ? ` · ${s.pessoas} ${s.pessoas > 1 ? "pessoas" : "pessoa"}` : ""} · ${s.comandas.length} ${s.comandas.length > 1 ? "comandas" : "comanda"}</small>
         <div class="pe-itens">${s.comandas.map((c) => `${s.comandas.length > 1 || c.nome ? `<div class="sub"><span>${esc(rotuloComanda(c))}${c.nome ? " · " + esc(c.nome) : ""}</span><span>${brl(subtotal(c))}</span></div>` : ""}
           ${itensValidos(c).map((i) => `<div><span>${i.qtd}x ${esc(i.nome)}</span><span>${brl(i.unit * i.qtd)}</span></div>`).join("")}`).join("")}</div>
         <div class="pe-t"><span>Total</span><b>${brl(s.total)}</b></div>
         <button class="btn pri cheio" data-fechar="${s.m}">Fechar conta</button>
         <div class="pe-links"><button data-imp="${s.m}">Imprimir conta</button><button data-set="${s.m}">Imprimir por setor</button><button data-det="${s.m}">Lançar / editar</button><button data-troc="${s.m}">Trocar mesa</button></div>
-      </article>`).join("") || `<p class="vazio">${qm ? "Nenhuma mesa com esse nome ou número." : "Nenhuma mesa aberta. Use “+ Abrir mesa” ou o app do garçom."}</p>`}</div>`;
+      </article>`).join("") || `<p class="vazio">${qm ? "Nenhuma mesa com esse nome ou número." : filtroMesa === "conta" ? "Nenhuma mesa pediu a conta." : "Nenhuma mesa aberta. Toque numa mesa livre do salão para abrir."}</p>`}</div>`;
+    $$("[data-fm]", el).forEach((b) => (b.onclick = () => { filtroMesa = b.dataset.fm; abaMesas(el); }));
+    $$("[data-mp]", el).forEach((b) => (b.onclick = () => { const m = +b.dataset.mp; if (situacaoMesa(m).status === "livre") abrirMesaCaixa(m); else detalheMesa(m); }));
     $("#buscaMesa", el).oninput = (e) => { buscaMesa = e.target.value; abaMesas(el); refocar(el, "#buscaMesa"); };
     const cs = (m) => comandasDaMesa(+m);
     $$("[data-fechar]", el).forEach((b) => (b.onclick = () => escolher(cs(b.dataset.fechar), "Fechar conta", (sel) =>
@@ -486,7 +516,7 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
   }
 
   // Mesmos campos do app do garçom: comanda, atendente, cliente, pessoas e mesa.
-  function abrirMesaCaixa() {
+  function abrirMesaCaixa(mesaInicial) {
     const gs = D.usuarios.filter((u) => u.ativo !== false && u.papel === "garcom");
     const s = abrirSheet(`${cabecalhoSheet("Criar comanda", "Abre a comanda e já escolhe os itens")}<div class="sh-b">
       <label class="f" for="abCom">Identificação da comanda <small class="muted">(opcional: em branco lança sem comanda)</small></label><input class="in grande" id="abCom" inputmode="numeric" maxlength="5" placeholder="Nº do cartão">
@@ -495,7 +525,7 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
         <div><label class="f" for="abPes">Nº de pessoas</label><input class="in" id="abPes" type="number" min="1" max="99" inputmode="numeric"></div></div>
       <label class="f" for="abMesa">Mesa</label><select class="in grande" id="abMesa"><option value="">Escolha a mesa</option>${Array.from({ length: Number(loja().nMesas) || 0 }, (_, i) => {
         const st = situacaoMesa(i + 1).status;
-        return `<option value="${i + 1}">Mesa ${i + 1}${st === "livre" ? "" : " (ocupada)"}</option>`;
+        return `<option value="${i + 1}" ${mesaInicial === i + 1 ? "selected" : ""}>Mesa ${i + 1}${st === "livre" ? "" : " (ocupada)"}</option>`;
       }).join("")}</select>
       <div class="err" id="aerr"></div><button class="btn pri cheio grande" id="ok">Avançar</button></div>`);
     setTimeout(() => $("#abCom", s).focus(), 50);
@@ -517,7 +547,8 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
         ${cs.map((c) => `<div class="card comanda"><div class="card-h"><div><b>${esc(rotuloComanda(c))}${c.nome ? " · " + esc(c.nome) : ""}</b><small>${esc(c.garcom || "")} · ${hora(c.criadoEm)}</small></div><b>${brl(subtotal(c))}</b></div>
           ${(c.itens || []).map((i) => linhaItem(i, { acoes: i.cancelado ? "" : `<button class="btn ghost sm" data-edl="${c.id}|${i.key}">Editar</button><button class="mini-x" data-ci="${c.id}|${i.key}" title="Cancelar item">×</button>${cs.length > 1 ? `<button class="mini-x" data-mv="${c.id}|${i.key}" title="Passar para outra comanda">⇄</button>` : ""}` })).join("") || `<p class="muted pq">Sem itens.</p>`}
           <div class="linha-btn wrap"><button class="btn sec sm" data-lc="${c.id}">+ Itens</button><button class="btn ghost sm" data-rs="${c.id}">Imprimir por setor</button><button class="btn ghost sm" data-rj="${c.id}">Imprimir tudo junto</button><button class="btn ghost sm" data-cc="${c.id}">Cancelar comanda</button></div></div>`).join("")}
-        <button class="btn sec cheio" id="nova">+ Outra comanda nesta mesa</button></div>`, { largo: true });
+        <div class="g-acoes"><button class="btn sec" id="nova">+ Outra comanda nesta mesa</button><button class="btn pri" id="fecharMesa">Fechar conta · ${brl(cs.reduce((x, c) => x + subtotal(c), 0))}</button></div></div>`, { largo: true });
+      $("#fecharMesa", s).onclick = () => escolher(comandasDaMesa(mesa), "Fechar conta", (sel) => receber(sel, usuario, { servico: servicoDe(sel), titulo: `Fechar mesa ${mesa}` }));
       $("#nova", s).onclick = async () => {
         const num = await pedirTexto(`Nova comanda · mesa ${mesa}`, "Número da comanda", { ok: "Abrir", tipo: "number" });
         if (!num) return;
@@ -589,6 +620,9 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
   delete raiz.dataset.pronto;
   desenhar();
   // O aviso de impressão parada depende da hora que passa, não só de mudanças no banco.
+  const tique = () => { const r = $("#relogioCx", raiz); if (r) r.textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); };
+  const tempos = setInterval(() => { if (!raiz.isConnected) return clearInterval(tempos); tique(); if (aba === "mesas") atualizarAba(true); }, 30000);
+  setTimeout(tique, 0);
   const relogio = setInterval(() => { if (raiz.isConnected) { avisoImpressora(); const b = $("#barraOnline", raiz); if (b && aba === "pedidos") barraOnline(b); } }, 20000);
   return () => { parar(); clearInterval(relogio); };
 }
