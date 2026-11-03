@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Sistema Elite</title>
+  <meta name="description" content="Sistema Elite: cardápio online, garçom com comandas, impressão por setor e caixa. Desenvolvido por Elite MKT." />
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Sistema Elite" />
+  <script>
+    // O app instalado pelo link do cardápio leva o nome e o ícone do restaurante; pelo link da equipe, o Sistema Elite.
+    // Tem que ser escolhido aqui, antes do navegador ler o manifesto.
+    (function () {
+      var cli = /^#\/?cardapio/.test(location.hash);
+      var l = document.createElement("link"); l.rel = "manifest"; l.href = cli ? "manifest-cardapio.webmanifest" : "manifest.webmanifest"; document.head.appendChild(l);
+      if (cli) { document.write('<link rel="apple-touch-icon" href="assets/amarilis-apple-touch.png">'); }
+    })();
+  </script>
+  <link rel="icon" href="assets/elite-logo-128.png" type="image/png" />
+  <script>if (!/^#\/?cardapio/.test(location.hash)) document.write('<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app" aria-live="polite"><div class="carregando">Carregando…</div></div>
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+  <div class="sheet s2" id="sheet2" role="dialog" aria-modal="true"></div>
+  <div class="toast" id="toast" role="status"></div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

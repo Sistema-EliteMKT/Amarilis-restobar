@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// Regras de segurança do banco do Sistema Elite.
+// "Equipe" = qualquer aparelho que entrou com a conta da loja (Firebase Authentication).
+// IMPORTANTE: em Authentication > Configurações > Ações do usuário, desmarque
+// "Ativar criação (inscrição)" para ninguém conseguir criar conta sozinho.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function equipe() { return request.auth != null; }
+
+    // Dados da loja e cardápio: o cliente lê, só a equipe muda.
+    match /config/loja { allow read: if true; allow write: if equipe(); }
+    match /config/{outro} { allow read, write: if equipe(); }
+    match /categorias/{id} { allow read: if true; allow write: if equipe(); }
+    match /produtos/{id} { allow read: if true; allow write: if equipe(); }
+
+    // Pedidos: o cliente do cardápio online só cria pedido novo de entrega/retirada
+    // e consegue consultar o próprio pedido pelo código (para acompanhar).
+    match /pedidos/{id} {
+      allow get: if true;
+      allow list, update, delete: if equipe();
+      allow create: if equipe() || (
+        request.resource.data.origem == 'online'
+        && request.resource.data.status == 'novo'
+        && request.resource.data.aberto == true
+        && request.resource.data.tipo in ['entrega', 'retirada']
+        && !('numero' in request.resource.data)
+        && !('pago' in request.resource.data)
+        && (request.resource.data.tipo != 'entrega' || (request.resource.data.cliente.cep is string && request.resource.data.cliente.cep.size() == 8 && request.resource.data.cliente.numero is string && request.resource.data.cliente.numero.size() > 0))
+        && request.resource.data.cliente.nome is string && request.resource.data.cliente.nome.size() > 0
+        && request.resource.data.cliente.telefone is string && request.resource.data.cliente.telefone.size() >= 10
+        && request.resource.data.itens is list
+        && request.resource.data.itens.size() > 0
+        && request.resource.data.itens.size() <= 60
+      );
+    }
+
+    // Equipe, motoboys, fila de impressão, pagamentos, clientes, travas de comanda, saídas, caixas abertos/fechados, movimentos e notas fiscais: só a equipe.
+    match /{colecao}/{id} {
+      allow read, write: if equipe() && colecao in ['usuarios', 'motoboys', 'impressoes', 'pagamentos', 'clientes', 'travas', 'saidas', 'caixas', 'movimentos', 'notas'];
+    }
+  }
+}

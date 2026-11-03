@@ -1,0 +1,14 @@
+{
+  "firebase": {
+    "apiKey": "COLE_AQUI",
+    "authDomain": "COLE_AQUI.firebaseapp.com",
+    "projectId": "COLE_AQUI",
+    "appId": "COLE_AQUI"
+  },
+  "email": "loja@seudominio.com",
+  "senha": "SENHA_DA_CONTA_DA_LOJA",
+  "acentos": "sem-acentos",
+  "impressoras": {
+    "imp1": { "nome": "Caixa - Epson TM-T20X-II (USB)", "tipo": "windows", "compartilhamento": "CAIXA", "colunas": 48, "comandos": "escpos", "tamanho": "medio", "fonte": "A" }
+  }
+}

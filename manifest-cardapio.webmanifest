@@ -1,0 +1,16 @@
+{
+  "name": "Cardápio Amarílis Restobar",
+  "short_name": "Amarílis",
+  "description": "Peça porções, pratos, drinks e cervejas do Amarílis Restobar.",
+  "lang": "pt-BR",
+  "start_url": "./#/cardapio",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#C61042",
+  "theme_color": "#C61042",
+  "icons": [
+    { "src": "assets/amarilis-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/amarilis-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/amarilis-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
