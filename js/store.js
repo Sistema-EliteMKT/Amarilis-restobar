@@ -51,6 +51,7 @@ function criarStoreLocal() {
 
   return {
     modo: "demo",
+    async lerPublico(col, id) { const t = ler(col); return id ? (t[id] ? { id, ...t[id] } : null) : Object.entries(t).map(([k, d]) => ({ id: k, ...d })); },
     async iniciar() {},
     aoMudarLoja(cb) { lojaCb = cb; cb({ email: "demonstracao" }); },
     async entrarLoja() { lojaCb({ email: "demonstracao" }); },
@@ -154,8 +155,66 @@ function criarStoreFirebase() {
   // Erro de permissão aparece no console; falta de internet só atrasa o envio.
   const semEsperar = (promessa) => promessa.catch((e) => { console.error(e); window.dispatchEvent(new CustomEvent("se-erro-gravacao", { detail: traduzir(e) })); });
 
+  // Leitura pública pela API REST do Firestore (fetch comum). Usada quando a conexão ao vivo
+  // não abre (navegador de dentro do Instagram/WhatsApp, iPhone em modo privado, rede que bloqueia).
+  const valor = (v) => {
+    if (!v) return null;
+    if ("stringValue" in v) return v.stringValue;
+    if ("integerValue" in v) return Number(v.integerValue);
+    if ("doubleValue" in v) return v.doubleValue;
+    if ("booleanValue" in v) return v.booleanValue;
+    if ("nullValue" in v) return null;
+    if ("timestampValue" in v) return Date.parse(v.timestampValue);
+    if ("arrayValue" in v) return (v.arrayValue.values || []).map(valor);
+    if ("mapValue" in v) return campos(v.mapValue.fields);
+    return null;
+  };
+  const campos = (f = {}) => Object.fromEntries(Object.entries(f).map(([k, v]) => [k, valor(v)]));
+  const urlRest = (caminho, extra = "") => `https://firestore.googleapis.com/v1/projects/${FIREBASE_CONFIG.projectId}/databases/(default)/documents/${caminho}?key=${FIREBASE_CONFIG.apiKey}${extra}`;
+  const doRest = (d) => ({ id: d.name.split("/").pop(), ...campos(d.fields) });
+  const paraRest = (v) => {
+    if (v === null) return { nullValue: null };
+    if (typeof v === "boolean") return { booleanValue: v };
+    if (typeof v === "number") return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    if (typeof v === "string") return { stringValue: v };
+    if (Array.isArray(v)) return { arrayValue: { values: v.filter((x) => x !== undefined).map(paraRest) } };
+    return { mapValue: { fields: paraCampos(v) } };
+  };
+  const paraCampos = (o) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined).map(([k, v]) => [k, paraRest(v)]));
+
   return {
     modo: "online",
+    // Pedido do cliente (cardápio online): grava pelo caminho normal e espera a confirmação do banco.
+    // Se em 6 s não confirmar (conexão ao vivo bloqueada), grava pela API REST com o MESMO id
+    // (se o caminho normal chegar depois, é o mesmo documento: não duplica).
+    async criarPublico(col, dados) {
+      const r = fb.doc(fb.collection(db, col));
+      const normal = fb.setDoc(r, dados).then(() => "ok");
+      normal.catch(() => {});
+      const res = await Promise.race([normal, new Promise((ok) => setTimeout(() => ok("demorou"), 6000))]).catch((e) => { throw traduzir(e); });
+      if (res === "ok") return r.id;
+      const resp = await fetch(urlRest(col, `&documentId=${encodeURIComponent(r.id)}`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fields: paraCampos(dados) }) });
+      if (resp.ok || resp.status === 409) return r.id; // 409: o caminho normal chegou antes
+      throw new Error("Não deu para enviar o pedido. Confira a internet e tente de novo.");
+    },
+    async lerPublico(col, id) {
+      if (id) {
+        const r = await fetch(urlRest(`${col}/${id}`));
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return doRest(await r.json());
+      }
+      const out = [];
+      let token = "";
+      for (let i = 0; i < 10; i++) {
+        const r = await fetch(urlRest(col, `&pageSize=300${token ? `&pageToken=${encodeURIComponent(token)}` : ""}`));
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        out.push(...(j.documents || []).map(doRest));
+        if (!(token = j.nextPageToken)) break;
+      }
+      return out;
+    },
     async iniciar() {
       const [app, a, f] = await Promise.all([
         import(`${base}/firebase-app.js`),

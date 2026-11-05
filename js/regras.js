@@ -38,11 +38,21 @@ export function conectar({ publico = false } = {}) {
   desligarPesados.forEach((f) => f());
   desligar = []; desligarPesados = [];
   ultimoPublico = publico;
+  D.carregou = { loja: false, categorias: false, produtos: false };
+  D.falhaCarregar = false;
+  let planoB = null;
+  const chegou = (k) => { D.carregou[k] = true; };
+  const tentarPlanoB = () => { if (!planoB) planoB = carregarPeloPlanoB(); };
   desligar = [
-    store.ouvirDoc("config", "loja", (d) => { D.loja = d; avisar(); }),
-    store.ouvir("categorias", (docs) => { D.categorias = docs.sort(ordem); avisar(); }),
-    store.ouvir("produtos", (docs) => { D.produtos = docs.sort(ordem); avisar(); }),
+    store.ouvirDoc("config", "loja", (d) => { D.loja = d; chegou("loja"); avisar(); }, tentarPlanoB),
+    store.ouvir("categorias", (docs) => { if (docs.length || !D.categorias.length) D.categorias = docs.sort(ordem); if (docs.length) chegou("categorias"); avisar(); }, null, tentarPlanoB),
+    store.ouvir("produtos", (docs) => { if (docs.length || !D.produtos.length) D.produtos = docs.sort(ordem); if (docs.length) chegou("produtos"); avisar(); }, null, tentarPlanoB),
   ];
+  // Plano B: se em 4 s a conexão ao vivo não trouxe o cardápio, busca por uma leitura comum.
+  const t1 = setTimeout(() => { if (!D.carregou.produtos || !D.carregou.categorias) tentarPlanoB(); }, 4000);
+  // Plano C: em 15 s, se nada chegou, mostra o botão "Tentar de novo".
+  const t2 = setTimeout(() => { if (!D.produtos.length) { D.falhaCarregar = true; avisar(); } }, 15000);
+  desligar.push(() => clearTimeout(t1), () => clearTimeout(t2));
   if (publico) return;
   const dia = hoje();
   desligar.push(
@@ -73,6 +83,22 @@ function ligarPesados(dia) {
 }
 
 // Garçom: desliga o que não usa (menos leituras no banco). Caixa/administrador: religa tudo.
+// Busca loja, categorias e produtos sem a conexão ao vivo (só preenche o que ainda não chegou).
+async function carregarPeloPlanoB() {
+  try {
+    const [lj, cats, prods] = await Promise.all([
+      D.carregou.loja ? null : store.lerPublico("config", "loja"),
+      D.carregou.categorias ? null : store.lerPublico("categorias"),
+      D.carregou.produtos ? null : store.lerPublico("produtos"),
+    ]);
+    if (lj && !D.carregou.loja) D.loja = lj;
+    if (cats?.length && !D.carregou.categorias) D.categorias = cats.sort(ordem);
+    if (prods?.length && !D.carregou.produtos) D.produtos = prods.sort(ordem);
+    if (D.produtos.length) D.falhaCarregar = false;
+    avisar();
+  } catch (e) { console.error("plano B", e); }
+}
+
 export function modoLeve(sim) {
   if (sim === leve || ultimoPublico) return;
   leve = sim;
@@ -340,7 +366,7 @@ export async function criarPedido(dados, quem) {
     itens: dados.itens.map((i) => ({ ...i, key: i.key || novoId(), enviadoEm: online ? null : Date.now() })),
   };
   if (!online) base.numero = await numeroDoPedido();
-  const id = await store.criar("pedidos", base);
+  const id = online && store.criarPublico ? await store.criarPublico("pedidos", base) : await store.criar("pedidos", base);
   if (!online) await imprimirNovoPedido({ id, ...base }, quem);
   return id;
 }

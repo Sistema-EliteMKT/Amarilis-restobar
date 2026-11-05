@@ -39,7 +39,7 @@ export function telaCardapio(raiz) {
       <div class="c-wrap">
         <div id="acomp"></div>
         <div class="c-cats"><div class="chips">${cats.map((c) => `<button class="chip" data-c="${esc(c.id)}" aria-pressed="${c.id === cat}">${esc(c.nome)}</button>`).join("")}</div></div>
-        <div id="menu">${cats.map((c) => secao(c)).join("") || `<p class="vazio">Cardápio ainda não cadastrado.</p>`}</div>
+        <div id="menu">${cats.map((c) => secao(c)).join("") || (D.falhaCarregar ? `<div class="vazio">Não conseguimos carregar o cardápio. Confira a internet e toque em tentar de novo.<br><button class="btn pri" style="margin-top:10px" onclick="location.reload()">Tentar de novo</button><br><small>Se abriu pelo Instagram ou WhatsApp, toque nos 3 pontinhos e escolha <b>Abrir no navegador</b>.</small></div>` : D.carregou && (!D.carregou.produtos || !D.carregou.categorias) ? `<p class="vazio carregando-cardapio">Carregando cardápio…</p>` : `<p class="vazio">Cardápio ainda não cadastrado.</p>`)}</div>
         ${rodapeMarca()}
       </div>
       <div class="cartbar" id="cartbar" ${sacola.length ? "" : "hidden"}><button id="verSacola"><span><span class="q">${sacola.reduce((s, l) => s + l.qtd, 0)}</span>Ver sacola</span><span>${brl(sacola.reduce((s, l) => s + l.unit * l.qtd, 0))}</span></button></div>`;
