@@ -607,3 +607,7 @@ body{letter-spacing:-.005em}
 .cx-data{text-transform:none}
 .kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:1180px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* desconto do primeiro pedido */
+.c-hero .c-promo{display:inline-block;max-width:none;margin:12px auto 0;background:var(--gold);color:var(--wine);border-radius:14px;padding:7px 14px;font-size:14px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.c-hero .c-promo b{font-weight:800}

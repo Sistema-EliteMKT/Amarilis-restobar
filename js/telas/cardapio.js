@@ -11,6 +11,12 @@ const fmtCep = (c) => { const n = String(c || "").replace(/\D/g, "").slice(0, 8)
 const K = "se_cliente";
 const lerLocal = () => { try { return JSON.parse(localStorage.getItem(K)) || {}; } catch { return {}; } };
 const gravarLocal = (v) => { try { localStorage.setItem(K, JSON.stringify({ ...lerLocal(), ...v })); } catch {} };
+// Desconto no primeiro pedido: vale para quem nunca pediu por este celular. Liga/desliga e % em Ajustes > Cupons.
+const PRIMEIRO = "PRIMEIRO PEDIDO";
+const pctPrimeiro = (lj) => {
+  const pp = { ativo: true, pct: 10, ...(lj.primeiroPedido || {}) };
+  return pp.ativo && !lerLocal().ultimo ? Math.min(50, Math.max(0, Number(pp.pct) || 0)) : 0;
+};
 
 export function telaCardapio(raiz) {
   const sacola = [];
@@ -27,6 +33,7 @@ export function telaCardapio(raiz) {
       <header class="c-hero"><div class="pat" aria-hidden="true"></div><div class="c-hero-in">
         ${lj.logoClaro ? `<img src="${esc(lj.logoClaro)}" alt="${esc(lj.nome)}">` : `<h1>${esc(lj.nome)}</h1>`}
         ${lj.slogan ? `<p>${esc(lj.slogan)}</p>` : ""}
+        ${pctPrimeiro(lj) ? `<p class="c-promo">🎁 <b>${pctPrimeiro(lj)}% de desconto</b> no seu primeiro pedido pelo app</p>` : ""}
         <div class="facts"><span id="statusOnline" class="${statusOnline(lj).aberto ? "st-aberto" : "st-fechado"}">${statusOnline(lj).aberto ? "🟢" : "🔴"} ${esc(statusOnline(lj).texto)}</span>${previsao(lj, "entrega") ? `<span>🛵 Entrega ${esc(previsao(lj, "entrega"))}</span>` : ""}${previsao(lj, "retirada") ? `<span>🥡 Retirada ${esc(previsao(lj, "retirada"))}</span>` : ""}${lj.telefone ? `<span>${esc(lj.telefone)}</span>` : ""}</div>
       </div></header>
       <div class="c-wrap">
@@ -66,7 +73,8 @@ export function telaCardapio(raiz) {
     const taxas = lj.taxasEntrega || [];
     const porRaio = entregaPorRaio(lj);
     let loc = salvo.lat != null && porRaio ? { ponto: [salvo.lat, salvo.lng], ...taxaDoPonto(lj, [salvo.lat, salvo.lng]) } : null;
-    let ctl = null, autoEnd = "", cupomAplicado = null, ruaEditada = false; // ruaEditada: a pessoa mexeu na rua; aí o CEP não troca mais
+    const auto = pctPrimeiro(lj) ? { codigo: PRIMEIRO, pct: pctPrimeiro(lj) } : null; // desconto do primeiro pedido, já aplicado
+    let ctl = null, autoEnd = "", cupomAplicado = auto, ruaEditada = false; // ruaEditada: a pessoa mexeu na rua; aí o CEP não troca mais
     const formas = lj.formasPagamento || [];
     const s = abrirSheet(`${cabecalhoSheet("Sua sacola")}<div class="sh-b">
       <div id="linhas"></div>
@@ -153,7 +161,7 @@ export function telaCardapio(raiz) {
       $("#linhas", s).innerHTML = sacola.map((l, i) => `<div class="cl"><div class="n"><b>${esc(l.nome)}</b>${l.det.map((d) => `<small>${esc(d)}</small>`).join("")}${l.obs ? `<small>Obs: ${esc(l.obs)}</small>` : ""}<small>${brl(l.unit * l.qtd)}</small></div>
         <div class="mini"><button class="ed" data-ed="${i}">Editar</button><button data-menos="${i}" aria-label="Diminuir">−</button><span>${l.qtd}</span><button data-mais="${i}" aria-label="Aumentar">+</button></div></div>`).join("") || `<p class="vazio">Sacola vazia.</p>`;
       const t = total();
-      $("#sum", s).innerHTML = `<div><span>Itens</span><span>${brl(t.sub)}</span></div>${t.desc ? `<div><span>Cupom ${esc(cupomAplicado.codigo)} (${cupomAplicado.pct}%)</span><span>- ${brl(t.desc)}</span></div>` : ""}${modo === "entrega" ? `<div><span>Entrega${porRaio && loc ? ` (${loc.area || kmTxt(loc.km)})` : ""}</span><span>${porRaio && !loc ? "a confirmar pelo restaurante" : !porRaio && taxas.length && !$("#cb", s)?.value ? "escolha o bairro" : brl(t.taxa)}</span></div>` : ""}<div class="t"><span>Total</span><span>${brl(t.total)}</span></div>${modo === "entrega" && $("#ce", s).value.trim() ? `<div class="addr-conf"><span>📍 Entregar em</span><span>${esc($("#ce", s).value.trim())}${$("#cnum", s).value.trim() ? ", " + esc($("#cnum", s).value.trim()) : ""}${$("#ccomp", s).value.trim() ? " - " + esc($("#ccomp", s).value.trim()) : ""}</span></div>` : ""}`;
+      $("#sum", s).innerHTML = `<div><span>Itens</span><span>${brl(t.sub)}</span></div>${t.desc ? `<div class="ok-txt"><span>${cupomAplicado.codigo === PRIMEIRO ? "🎁 Desconto do primeiro pedido" : `Cupom ${esc(cupomAplicado.codigo)}`} (${cupomAplicado.pct}%)</span><span>- ${brl(t.desc)}</span></div>` : ""}${modo === "entrega" ? `<div><span>Entrega${porRaio && loc ? ` (${loc.area || kmTxt(loc.km)})` : ""}</span><span>${porRaio && !loc ? "a confirmar pelo restaurante" : !porRaio && taxas.length && !$("#cb", s)?.value ? "escolha o bairro" : brl(t.taxa)}</span></div>` : ""}<div class="t"><span>Total</span><span>${brl(t.total)}</span></div>${modo === "entrega" && $("#ce", s).value.trim() ? `<div class="addr-conf"><span>📍 Entregar em</span><span>${esc($("#ce", s).value.trim())}${$("#cnum", s).value.trim() ? ", " + esc($("#cnum", s).value.trim()) : ""}${$("#ccomp", s).value.trim() ? " - " + esc($("#ccomp", s).value.trim()) : ""}</span></div>` : ""}`;
       $$("[data-menos]", s).forEach((b) => (b.onclick = () => { const l = sacola[b.dataset.menos]; if (--l.qtd <= 0) sacola.splice(b.dataset.menos, 1); atualizar(); desenhar(); }));
       $$("[data-mais]", s).forEach((b) => (b.onclick = () => { sacola[b.dataset.mais].qtd++; atualizar(); desenhar(); }));
       $$("[data-ed]", s).forEach((b) => (b.onclick = () => editarItem(sacola[b.dataset.ed], "delivery", (novo) => { sacola[b.dataset.ed] = novo; atualizar(); desenhar(); }, { cliente: true })));
@@ -166,7 +174,7 @@ export function telaCardapio(raiz) {
       const cod = $("#ccup", s).value.trim().toUpperCase().replace(/\s+/g, "");
       const c = (lj.cupons || []).find((x) => x.ativo !== false && String(x.codigo || "").toUpperCase() === cod);
       const msg = $("#cupMsg", s);
-      cupomAplicado = null;
+      cupomAplicado = auto; // cupom vazio ou inválido: fica o desconto do primeiro pedido (se tiver)
       if (!cod) msg.innerHTML = "";
       else if (!c) msg.innerHTML = `<span class="ruim-txt">Cupom não encontrado ou fora da validade.</span>`;
       else if (usados().includes(c.codigo.toUpperCase())) msg.innerHTML = `<span class="ruim-txt">Esse cupom já foi usado neste aparelho.</span>`;
@@ -215,7 +223,7 @@ export function telaCardapio(raiz) {
           ...(modo === "entrega" && porRaio && !loc ? { taxaPendente: true } : {}),
         });
         gravarLocal({ ...c, modo, ultimo: id });
-        if (cupomAplicado) try { localStorage.setItem("se_cupons", JSON.stringify([...usados(), cupomAplicado.codigo])); } catch {}
+        if (cupomAplicado && cupomAplicado.codigo !== PRIMEIRO) try { localStorage.setItem("se_cupons", JSON.stringify([...usados(), cupomAplicado.codigo])); } catch {}
         sacola.length = 0;
         fecharSheet();
         toast("Pedido enviado! Acompanhe aqui em cima.");

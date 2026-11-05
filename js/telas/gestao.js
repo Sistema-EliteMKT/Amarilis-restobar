@@ -107,10 +107,20 @@ function cardCupons(el) {
   const salvar = (l) => store.salvar("config", "loja", { cupons: l }).catch(erro);
   const desenhar = () => {
     const cs = lista();
-    el.innerHTML = `<b>🏷️ Cupons de desconto (cardápio online)</b><p class="muted pq">O cliente digita o cupom na sacola e o desconto vale sobre os itens (não sobre a entrega). Cada celular usa o mesmo cupom uma vez só. Confira no pedido se é mesmo a primeira compra da pessoa.</p>
+    const pp = { ativo: true, pct: 10, ...(loja().primeiroPedido || {}) };
+    el.innerHTML = `<b>🎁 Desconto no primeiro pedido (cardápio online)</b><p class="muted pq">Entra sozinho para quem nunca pediu pelo celular que está usando (não precisa digitar cupom). Vale sobre os itens, não sobre a entrega. No pedido aparece "Cupom PRIMEIRO PEDIDO".</p>
+      <div class="serv-lin"><label class="opt"><input type="checkbox" id="ppAt" ${pp.ativo ? "checked" : ""}><span>Ligado</span></label><input class="in" id="ppPct" type="number" min="1" max="50" value="${Number(pp.pct) || 10}" aria-label="Porcentagem"><span>%</span><button class="btn ghost sm" id="ppOk">Salvar</button></div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+      <b>🏷️ Cupons de desconto (cardápio online)</b><p class="muted pq">O cliente digita o cupom na sacola e o desconto vale sobre os itens (não sobre a entrega). Cada celular usa o mesmo cupom uma vez só. Confira no pedido se é mesmo a primeira compra da pessoa.</p>
       ${cs.map((c, i) => `<div class="cl"><div class="n"><b>${esc(c.codigo)}</b><small>${Number(c.pct) || 0}% de desconto · ${c.ativo === false ? "desligado" : "valendo"}</small></div>
         <div class="v"><button class="btn ghost sm" data-liga="${i}">${c.ativo === false ? "Ligar" : "Desligar"}</button><button class="mini-x" data-rm="${i}" aria-label="Remover">×</button></div></div>`).join("") || `<p class="vazio">Nenhum cupom ainda.</p>`}
       <div class="linha-btn wrap"><input class="in" id="cuc" placeholder="Código (ex.: PRIMEIRO10)" autocapitalize="characters"><input class="in" id="cup" type="number" min="1" max="50" placeholder="%" style="max-width:90px"><button class="btn pri" id="cua">Criar cupom</button></div>`;
+    $("#ppOk", el).onclick = async () => {
+      const pct = Math.min(50, Math.max(1, Number($("#ppPct", el).value) || 10));
+      await store.salvar("config", "loja", { primeiroPedido: { ativo: $("#ppAt", el).checked, pct } }).catch(erro);
+      toast($("#ppAt", el).checked ? `Primeiro pedido com ${pct}% de desconto ✓` : "Desconto do primeiro pedido desligado", "bom"); setTimeout(desenhar, 300);
+    };
+    $("#ppAt", el).onchange = () => $("#ppOk", el).click();
     $("#cua", el).onclick = async () => {
       const codigo = $("#cuc", el).value.trim().toUpperCase().replace(/\s+/g, ""), pct = Math.min(50, Number($("#cup", el).value) || 0);
       if (!codigo || !pct) return toast("Coloque o código e a porcentagem.");
