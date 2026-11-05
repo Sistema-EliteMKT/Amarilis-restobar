@@ -116,7 +116,15 @@ export const vendeEm = (p, onde) => p.ativo !== false && promoValida(p) && (!ond
 // Primeira vez: grava loja, cardápio e equipe iniciais.
 export async function semearSePreciso() {
   const atual = await store.obter("config", "loja");
-  if (atual) return false;
+  if (atual) {
+    // Uma vez só: a loja já existia sem bairros de entrega. Grava a lista inicial (os bairros da pizzaria).
+    // Se depois alguém apagar todos de propósito, não volta (bairrosImportadosEm fica marcado).
+    if (!(atual.taxasEntrega || []).length && !atual.bairrosImportadosEm && TAXAS_ENTREGA.length) {
+      await store.lote([{ tipo: "salvar", col: "config", id: "loja", dados: { taxasEntrega: TAXAS_ENTREGA, bairrosImportadosEm: Date.now() } }]);
+      return "bairros";
+    }
+    return false;
+  }
   const ops = [
     { tipo: "salvar", col: "config", id: "loja", dados: { ...LOJA_INICIAL, bordas: BORDAS, taxasEntrega: TAXAS_ENTREGA, adicionais: ADICIONAIS, criadoEm: Date.now() } },
     ...CATEGORIAS.map((c) => ({ tipo: "salvar", col: "categorias", id: c.id, dados: (({ id, ...r }) => r)(c) })),

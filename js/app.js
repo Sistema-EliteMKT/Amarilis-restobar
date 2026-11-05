@@ -149,7 +149,7 @@ $("#scrim").onclick = fecharSheet;
   store.aoMudarLoja(async (u) => {
     contaLoja = u;
     if (u && !location.hash.startsWith("#/cardapio")) {
-      try { if (await semearSePreciso()) toast("Sistema preparado com o cardápio inicial ✓"); } catch (e) { erro(e); }
+      try { const r = await semearSePreciso(); if (r === "bairros") toast("Bairros de entrega cadastrados ✓"); else if (r) toast("Sistema preparado com o cardápio inicial ✓"); } catch (e) { erro(e); }
       conectar();
       iniciarEstacao();
     }
