@@ -623,6 +623,8 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
   const tique = () => { const r = $("#relogioCx", raiz); if (r) r.textContent = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }); };
   const tempos = setInterval(() => { if (!raiz.isConnected) return clearInterval(tempos); tique(); if (aba === "mesas") atualizarAba(true); }, 30000);
   setTimeout(tique, 0);
-  const relogio = setInterval(() => { if (raiz.isConnected) { avisoImpressora(); const b = $("#barraOnline", raiz); if (b && aba === "pedidos") barraOnline(b); } }, 20000);
+  const relogio = setInterval(() => { if (raiz.isConnected) {
+    // Segurança: pedido online novo ainda sem papel sai aqui também (mesmo com a tela minimizada).
+    D.abertos.filter((p) => p.status === "novo").forEach((p) => imprimirViaOnline(p)); avisoImpressora(); const b = $("#barraOnline", raiz); if (b && aba === "pedidos") barraOnline(b); } }, 20000);
   return () => { parar(); clearInterval(relogio); };
 }

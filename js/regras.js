@@ -21,11 +21,17 @@ export const D = {
 const ouvintes = new Set();
 export const aoMudar = (fn) => { ouvintes.add(fn); return () => ouvintes.delete(fn); };
 let agendado = false;
+// Junta várias mudanças seguidas num redesenho só. Com a janela minimizada ou atrás de outra,
+// o navegador para o requestAnimationFrame: aí vai pelo setTimeout, senão o caixa não reage
+// (e o papel do pedido online não sai) até alguém voltar para a tela.
+const rodarAvisos = () => { if (!agendado) return; agendado = false; ouvintes.forEach((f) => f()); };
 const avisar = () => {
   if (agendado) return;
   agendado = true;
-  requestAnimationFrame(() => { agendado = false; ouvintes.forEach((f) => f()); });
+  if (document.hidden) setTimeout(rodarAvisos, 0);
+  else { requestAnimationFrame(rodarAvisos); setTimeout(rodarAvisos, 300); }
 };
+document.addEventListener("visibilitychange", () => { if (document.hidden && agendado) setTimeout(rodarAvisos, 0); });
 const ordem = (a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || String(a.nome).localeCompare(b.nome);
 
 let desligar = [];
