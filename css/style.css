@@ -611,3 +611,13 @@ body{letter-spacing:-.005em}
 /* desconto do primeiro pedido */
 .c-hero .c-promo{display:inline-block;max-width:none;margin:12px auto 0;background:var(--gold);color:var(--wine);border-radius:14px;padding:7px 14px;font-size:14px;font-weight:600;box-shadow:0 6px 18px rgba(0,0,0,.18)}
 .c-hero .c-promo b{font-weight:800}
+
+/* alarme de pedido novo pelo app */
+.alarme-faixa{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:96;display:flex;align-items:center;gap:12px;width:min(640px,calc(100% - 20px));padding:12px 14px;border-radius:18px;background:linear-gradient(135deg,var(--red),var(--red-2));color:#fff;box-shadow:0 14px 40px rgba(120,0,30,.45);animation:alarmeEntra .25s ease,chama 1.4s infinite;cursor:default}
+.alarme-sino{font-size:26px;animation:balanca .5s ease-in-out infinite alternate;transform-origin:50% 10%}
+.alarme-txt{flex:1;min-width:0;line-height:1.25}.alarme-txt b{display:block;font-size:16px}.alarme-txt small{opacity:.9;font-size:13px}
+.alarme-faixa .btn{background:#fff;color:var(--red-2);border:0}.alarme-faixa .btn.ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.6)}
+@keyframes balanca{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+@keyframes alarmeEntra{from{opacity:0;transform:translate(-50%,-10px)}}
+@media (prefers-reduced-motion:reduce){.alarme-faixa,.alarme-sino{animation:none}}
+@media (max-width:520px){.alarme-faixa{flex-wrap:wrap}.alarme-faixa .btn{flex:1}}

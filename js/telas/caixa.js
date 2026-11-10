@@ -16,6 +16,7 @@ import { abaPromocoes } from "./promocoes.js";
 import { barraOnline } from "./horario-ui.js";
 import { entregaPorRaio, localizador, kmTxt } from "../entrega.js";
 import { servicoDe } from "./garcom.js";
+import { alarmePedidos, alternarSom, lerSom, pararAlarme } from "../alarme.js";
 import { abaMotoboys, abaImpressao, abaRelatorio, abaCardapio, abaAjustes, abaEquipe } from "./gestao.js";
 
 const ABAS = [
@@ -47,7 +48,9 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
     const novos = D.abertos.filter((p) => p.status === "novo");
     const chegaram = novos.filter((p) => !vistos.has(p.id));
     chegaram.forEach((p) => vistos.add(p.id));
-    if (chegaram.length && !primeira) { bip(3); toast("Pedido novo pelo cardápio online!", "bom"); }
+    if (chegaram.length && !primeira) toast("Pedido novo pelo cardápio online!", "bom");
+    // Toque de telefone + notificação até alguém aceitar (ou silenciar).
+    alarmePedidos(novos.filter((p) => p.origem === "online"), { primeira, ver: () => { aba = "pedidos"; sessionStorage.setItem("se_aba", aba); atualizarAbas(); atualizarAba(); } });
     // Imprime a via de todo pedido online novo ainda sem papel (inclusive os que chegaram com o caixa fechado).
     novos.forEach((p) => imprimirViaOnline(p));
     primeira = false;
@@ -64,7 +67,7 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
         <div class="cx-main">
           <header class="cx-top">
             <div class="cx-tit"><h1 id="tituloAba"></h1><span class="cx-data">${(() => { const d = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }); return d.charAt(0).toUpperCase() + d.slice(1); })()} · <b id="relogioCx"></b></span></div>
-            <div class="cx-acoes"><button class="btn pri" id="novo">${icone("mais")}Novo pedido</button><button class="btn ghost" id="abrirMesa">${icone("mesas")}Abrir mesa</button><button class="btn ghost" id="garcom">${icone("celular")}Modo garçom</button></div>
+            <div class="cx-acoes"><button class="btn pri" id="novo">${icone("mais")}Novo pedido</button><button class="btn ghost" id="abrirMesa">${icone("mesas")}Abrir mesa</button><button class="btn ghost" id="garcom">${icone("celular")}Modo garçom</button><button class="btn ghost" id="somBtn" title="Toque de telefone quando chega pedido pelo app">${icone("sino")}<span>${lerSom().ligado ? "Som ligado" : "Som desligado"}</span></button></div>
           </header>
           <div id="avisoImp"></div>
           <main class="cx-corpo" id="corpo"></main>
@@ -72,6 +75,7 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
         </div></div>`;
       $("#sair", raiz).onclick = sair;
       $("#garcom", raiz).onclick = modoGarcom;
+      $("#somBtn", raiz).onclick = () => { const l = alternarSom(); $("#somBtn span", raiz).textContent = l ? "Som ligado" : "Som desligado"; toast(l ? "Som de pedido novo ligado 🔔" : "Som de pedido novo desligado"); };
       $("#novo", raiz).onclick = () => novoPedido();
       $("#abrirMesa", raiz).onclick = () => abrirMesaCaixa();
       atualizarAba();
@@ -626,5 +630,5 @@ export function telaCaixa(raiz, usuario, { sair, modoGarcom }) {
   const relogio = setInterval(() => { if (raiz.isConnected) {
     // Segurança: pedido online novo ainda sem papel sai aqui também (mesmo com a tela minimizada).
     D.abertos.filter((p) => p.status === "novo").forEach((p) => imprimirViaOnline(p)); avisoImpressora(); const b = $("#barraOnline", raiz); if (b && aba === "pedidos") barraOnline(b); } }, 20000);
-  return () => { parar(); clearInterval(relogio); };
+  return () => { parar(); clearInterval(relogio); pararAlarme(); };
 }
