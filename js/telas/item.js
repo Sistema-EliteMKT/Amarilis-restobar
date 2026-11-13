@@ -160,7 +160,7 @@ export function editarItem(item, onde, aoSalvar, { cliente = false } = {}) {
 export function editarLancado(pedido, item, quem, onde, aoFim = () => {}) {
   let rasc = { ...item };
   const des = () => {
-    const s = abrirSheet(`${cabecalhoSheet("Alterar item", "Já foi para a produção: se mudar o pedido, sai um papel ALTERADO no setor")}<div class="sh-b">
+    const s = abrirSheet(`${cabecalhoSheet("Alterar item", loja().imprimirAlteracao === true ? "Já foi para a produção: se mudar o pedido, sai um papel ALTERADO no setor" : "A mudança fica registrada no sistema (não imprime papel novo)")}<div class="sh-b">
       <div class="cl"><div class="n"><b>${esc(rasc.nome)}</b>${(rasc.det || []).map((d) => `<small>${esc(d)}</small>`).join("")}${rasc.obs ? `<small class="obs">Obs: ${esc(rasc.obs)}</small>` : ""}</div></div>
       <button class="btn sec cheio" id="esc">Mudar sabores, borda, adicionais ou observação</button>
       <div class="opts dois"><div><label class="f">Quantidade</label><div class="qtd"><button id="qm" aria-label="Diminuir">−</button><span id="qv">${rasc.qtd}</span><button id="qp" aria-label="Aumentar">+</button></div></div>

@@ -1,6 +1,6 @@
 // Cardápio do cliente: escolhe, monta a sacola e faz o pedido (entrega ou retirada).
 import { $, $$, esc, brl, hora, toast, erro, confirmar, buscaNaLista, abrirSheet, fecharSheet, cabecalhoSheet, rodapeMarca, numero, setasRolagem } from "../ui.js";
-import { D, loja, aoMudar, criarPedido, ETAPAS, totalPedido, vendeEm, itensValidos } from "../regras.js";
+import { D, loja, aoMudar, criarPedido, ETAPAS, totalPedido, vendeEm, itensValidos, textoPedido, whatsLoja } from "../regras.js";
 import { store } from "../store.js";
 import { entregaPorRaio, taxaDoPonto, localizador, kmTxt } from "../entrega.js";
 import { statusOnline, previsao } from "../horario.js";
@@ -262,6 +262,7 @@ export function telaCardapio(raiz) {
     el.innerHTML = p.status === "cancelado"
       ? `<div class="track"><h3>Pedido cancelado</h3><p class="muted">${esc(p.motivo || "Fale com a gente pelo telefone.")}</p><button class="btn sec sm" id="okAc">Ok</button></div>`
       : `<div class="track"><h3>Seu pedido${p.numero ? ` #${p.numero}` : ""}</h3><p class="muted">Feito às ${hora(p.criadoEm)} · ${brl(totalPedido(p))}</p>${previsaoHora(p)}
+        ${whatsLoja() && p.status !== "concluido" ? `<a class="btn ok cheio zap-conf" target="_blank" rel="noopener" href="https://wa.me/${whatsLoja()}?text=${encodeURIComponent(textoPedido(p, { paraLoja: true }))}">📲 Enviar confirmação no WhatsApp do restaurante</a>` : ""}
         <ol class="steps">${passos.map((k, i) => `<li class="${i < atual ? "done" : i === atual ? "now" : ""}">${esc(nomes[k])}</li>`).join("")}</ol>
         <details class="track-itens"><summary>Ver o que pedi</summary>
           ${itensValidos(p).map((i) => `<div class="cl"><div class="n"><b>${i.qtd}x ${esc(i.nome)}</b>${(i.det || []).map((d) => `<small>${esc(d)}</small>`).join("")}${i.obs ? `<small>Obs: ${esc(i.obs)}</small>` : ""}</div><div class="v">${brl(i.unit * i.qtd)}</div></div>`).join("")}

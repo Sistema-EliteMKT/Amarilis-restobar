@@ -621,3 +621,5 @@ body{letter-spacing:-.005em}
 @keyframes alarmeEntra{from{opacity:0;transform:translate(-50%,-10px)}}
 @media (prefers-reduced-motion:reduce){.alarme-faixa,.alarme-sino{animation:none}}
 @media (max-width:520px){.alarme-faixa{flex-wrap:wrap}.alarme-faixa .btn{flex:1}}
+
+.zap-conf{margin:10px 0 4px;text-decoration:none;display:flex;justify-content:center;background:#25D366;color:#fff}
