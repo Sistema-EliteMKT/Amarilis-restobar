@@ -282,9 +282,13 @@ export function abaImpressao(el, { admin }) {
 // ---------------------------------------------------------------- Relatório
 export function abaRelatorio(el, { usuario }) {
   const pags = D.pagamentos;
-  const total = pags.reduce((s, p) => s + p.total, 0);
   const porForma = {};
-  for (const p of pags) for (const x of p.pagamentos) porForma[x.forma] = (porForma[x.forma] || 0) + x.valor;
+  let fiadoHoje = 0;
+  for (const p of pags) for (const x of p.pagamentos) { if (x.forma === "Convênio") fiadoHoje += x.valor; else porForma[x.forma] = (porForma[x.forma] || 0) + x.valor; }
+  // Fiado de funcionário que foi pago hoje entra hoje.
+  const baixasHoje = D.movimentos.filter((m) => m.tipo === "fiadoRecebido");
+  for (const b of baixasHoje) porForma[b.forma] = (porForma[b.forma] || 0) + b.valor;
+  const total = pags.reduce((s, p) => s + p.total, 0) - fiadoHoje + baixasHoje.reduce((s, b) => s + b.valor, 0);
   // troco sai do dinheiro
   const troco = pags.reduce((s, p) => s + (p.troco || 0), 0);
   if (porForma.Dinheiro) porForma.Dinheiro -= troco;
@@ -314,7 +318,7 @@ export function abaRelatorio(el, { usuario }) {
       <div class="kpi"><b>${brl(pags.length ? total / pags.length : 0)}</b><span>ticket médio</span></div>
       <div class="kpi"><b>${brl(abertos)}</b><span>ainda a receber</span></div></div>
     <div class="grade">
-      <div class="card"><b>Por forma de pagamento</b><div class="sum">${Object.entries(porForma).map(([f, v]) => `<div><span>${esc(f)}</span><span>${brl(v)}</span></div>`).join("") || `<p class="vazio">Nada recebido ainda.</p>`}</div></div>
+      <div class="card"><b>Por forma de pagamento</b><div class="sum">${Object.entries(porForma).map(([f, v]) => `<div><span>${esc(f)}</span><span>${brl(v)}</span></div>`).join("") || `<p class="vazio">Nada recebido ainda.</p>`}${fiadoHoje ? `<div><span>Fiado de funcionários (não entra hoje)</span><span>${brl(fiadoHoje)}</span></div>` : ""}</div></div>
       <div class="card"><b>Por tipo</b><div class="sum">${Object.entries(porTipo).map(([t, v]) => `<div><span>${nomesTipo[t] || t}</span><span>${brl(v)}</span></div>`).join("") || `<p class="vazio">—</p>`}
         <div><span>Taxa de serviço</span><span>${brl(servico)}</span></div><div><span>Descontos</span><span>${brl(desconto)}</span></div>
         <div><span>Cancelados</span><span>${cancel.length}</span></div></div></div>

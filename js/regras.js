@@ -586,27 +586,36 @@ export async function resumoCaixa(cx) {
   const [pags, saidas, movs] = await Promise.all([store.consultar("pagamentos", f), store.consultar("saidas", f), store.consultar("movimentos", f)]);
   const dentro = (x) => x.criadoEm <= ate;
   const pg = pags.filter(dentro), sd = saidas.filter(dentro), mv = movs.filter(dentro).filter((m) => TIPOS_MOV[m.tipo]); // consumo da equipe também fica em "movimentos", mas não é do caixa
+  const baixas = movs.filter(dentro).filter((m) => m.tipo === "fiadoRecebido");
   const porForma = {};
-  let troco = 0, servico = 0, desconto = 0, vendas = 0;
+  let troco = 0, servico = 0, desconto = 0, vendas = 0, fiado = 0;
   for (const p of pg) {
-    for (const x of p.pagamentos) porForma[x.forma] = dinheiro((porForma[x.forma] || 0) + x.valor);
+    for (const x of p.pagamentos) {
+      // Convênio (fiado de funcionário) não é dinheiro que entrou hoje: fica separado até darem baixa.
+      if (x.forma === FORMA_CONVENIO) { fiado += x.valor; continue; }
+      porForma[x.forma] = dinheiro((porForma[x.forma] || 0) + x.valor);
+    }
     troco += p.troco || 0; servico += p.servico || 0; desconto += p.desconto || 0; vendas += p.total || 0;
   }
+  vendas -= fiado;
   if (porForma.Dinheiro) porForma.Dinheiro = dinheiro(porForma.Dinheiro - troco);
+  // Baixa de fiado (funcionário pagou): entra no caixa do dia em que foi dada.
+  for (const b of baixas) { porForma[b.forma] = dinheiro((porForma[b.forma] || 0) + b.valor); vendas += b.valor; }
+  const fiadoRecebido = dinheiro(baixas.reduce((a, b) => a + b.valor, 0));
   const soma = (t) => dinheiro(mv.filter((m) => m.tipo === t).reduce((a, m) => a + m.valor, 0));
   const sangrias = soma("sangria"), suprimentos = soma("suprimento"), despesas = soma("despesa");
   const freelaDinheiro = dinheiro(sd.filter((x) => x.forma === "Dinheiro").reduce((a, x) => a + x.valor, 0));
   const freelaTotal = dinheiro(sd.reduce((a, x) => a + x.valor, 0));
   const dinheiroVendas = porForma.Dinheiro || 0;
   const esperado = dinheiro((cx.fundo || 0) + dinheiroVendas + suprimentos - sangrias - despesas - freelaDinheiro);
-  return { pagamentos: pg, saidas: sd, movimentos: mv.sort((a, b) => a.criadoEm - b.criadoEm), porForma, servico: dinheiro(servico), desconto: dinheiro(desconto), vendas: dinheiro(vendas),
+  return { pagamentos: pg, saidas: sd, movimentos: mv.sort((a, b) => a.criadoEm - b.criadoEm), porForma, servico: dinheiro(servico), desconto: dinheiro(desconto), vendas: dinheiro(vendas), fiado: dinheiro(fiado), fiadoRecebido, baixas,
     sangrias, suprimentos, despesas, freelaDinheiro, freelaTotal, dinheiroVendas, esperado, contas: pg.length };
 }
 
 export async function fecharCaixa(cx, contado, obs, quem, conferencia = {}) {
   const r = await resumoCaixa(cx);
   const fechamento = { status: "fechado", fechadoEm: Date.now(), fechadoPor: quem?.nome || "", contado: dinheiro(contado), esperado: r.esperado, diferenca: dinheiro(contado - r.esperado), obs: obs || "", conferencia,
-    resumo: { porForma: r.porForma, vendas: r.vendas, servico: r.servico, desconto: r.desconto, sangrias: r.sangrias, suprimentos: r.suprimentos, despesas: r.despesas, freelaDinheiro: r.freelaDinheiro, contas: r.contas } };
+    resumo: { porForma: r.porForma, vendas: r.vendas, fiado: r.fiado, fiadoRecebido: r.fiadoRecebido, servico: r.servico, desconto: r.desconto, sangrias: r.sangrias, suprimentos: r.suprimentos, despesas: r.despesas, freelaDinheiro: r.freelaDinheiro, contas: r.contas } };
   await store.lote([
     { tipo: "salvar", col: "caixas", id: cx.id, dados: fechamento },
     filaImpressao(loja().impressoraConta, "Fechamento de caixa", cupomFechamentoCaixa({ ...cx, ...fechamento }, r)),
@@ -627,6 +636,8 @@ export function cupomFechamentoCaixa(cx, r) {
     L(`Aberto: ${hh(cx.abertoEm)} (${cx.abertoPor || "-"})`), L(`Fechado: ${hh(cx.fechadoEm || Date.now())} (${cx.fechadoPor || "-"})`), SEP,
     L("VENDAS", { b: true }), ...Object.entries(r.porForma).map(([f, v]) => L(lado(f, r2(v)))),
     L(lado("Total recebido", r2(r.vendas)), { b: true }), L(lado(`Contas (${r.contas})`, "")),
+    ...(r.fiadoRecebido ? [L(lado("(inclui fiado recebido)", r2(r.fiadoRecebido)))] : []),
+    ...(r.fiado ? [L(lado("Fiado funcionários (a receber)", r2(r.fiado)))] : []),
     ...(r.servico ? [L(lado("Taxa de serviço", r2(r.servico)))] : []), ...(r.desconto ? [L(lado("Descontos", r2(r.desconto)))] : []), SEP,
     L("DINHEIRO NA GAVETA", { b: true }), L(lado("Fundo de troco", r2(cx.fundo))), L(lado("+ Dinheiro das vendas", r2(r.dinheiroVendas))),
     ...(r.suprimentos ? [L(lado("+ Reforços", r2(r.suprimentos)))] : []), ...(r.sangrias ? [L(lado("- Sangrias", r2(r.sangrias)))] : []),
@@ -662,6 +673,16 @@ export async function lancarConsumo({ nome, funcionarioId = "", itens, descontoP
   if (imprimir) await imprimirProducao({ id, tipo: "consumo", nome, numero: "", itens: itens.map((i) => ({ ...i, enviadoEm: agora })) }, quem);
   return { id, ...reg };
 }
+// Baixa de fiado: o funcionário pagou (ou foi descontado). Entra no caixa do dia em que a baixa é dada.
+export const FORMA_DESCONTO_SALARIO = "Desconto no salário";
+export async function receberFiado({ funcionario, mes, valor, forma }, quem) {
+  if (!(Number(valor) > 0)) throw new Error("Coloque o valor.");
+  if (!forma) throw new Error("Escolha a forma.");
+  const reg = { tipo: "fiadoRecebido", funcionario, mes, valor: dinheiro(valor), forma, dia: hoje(), criadoEm: Date.now(), caixa: D.caixa?.id || null, por: quem?.nome || "" };
+  const id = await store.criar("movimentos", reg);
+  return { id, ...reg };
+}
+export const baixasDoMes = async (mes) => (await store.consultar("movimentos", ["mes", "==", mes])).filter((m) => m.tipo === "fiadoRecebido").sort((a, b) => a.criadoEm - b.criadoEm);
 export const consumosDoMes = async (mes) => (await store.consultar("movimentos", ["mes", "==", mes])).filter((m) => m.tipo === "consumo").sort((a, b) => a.criadoEm - b.criadoEm);
 
 // Extrato do mês de um funcionário, para imprimir e assinar.

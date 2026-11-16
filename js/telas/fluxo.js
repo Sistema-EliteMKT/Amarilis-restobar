@@ -34,7 +34,7 @@ function corpoResumo(cx, r) {
       ${linha("Deve ter na gaveta", brl(r.esperado), "t")}</div></div>
     <div class="card"><b>Vendas desde a abertura</b><div class="sum">
       ${Object.entries(r.porForma).map(([f, v]) => linha(esc(f), brl(v))).join("") || `<p class="vazio">Nada recebido ainda.</p>`}
-      ${linha("Total recebido", brl(r.vendas), "t")}${linha("Contas", r.contas)}${r.servico ? linha("Taxa de serviço", brl(r.servico)) : ""}${r.desconto ? linha("Descontos", brl(r.desconto)) : ""}</div></div></div>
+      ${linha("Total recebido", brl(r.vendas), "t")}${r.fiadoRecebido ? linha("↳ inclui fiado recebido", brl(r.fiadoRecebido)) : ""}${r.fiado ? linha("Fiado de funcionários (não entra hoje)", brl(r.fiado)) : ""}${linha("Contas", r.contas)}${r.servico ? linha("Taxa de serviço", brl(r.servico)) : ""}${r.desconto ? linha("Descontos", brl(r.desconto)) : ""}</div></div></div>
     <div class="card"><b>Movimentações</b>${r.movimentos.map((m) => `<div class="cl"><div class="n"><b>${esc(TIPOS_MOV[m.tipo])}</b><small>${hora(m.criadoEm)}${m.motivo ? " · " + esc(m.motivo) : ""} · ${esc(m.por)}</small></div><div class="v">${m.tipo === "suprimento" ? "+" : "−"} ${brl(m.valor)}</div></div>`).join("") || `<p class="vazio">Nenhuma ainda.</p>`}</div>`;
 }
 
@@ -70,7 +70,7 @@ async function fechar(cx, usuario) {
   let r;
   try { r = await resumoCaixa(cx); } catch (e) { return erro(e); }
   // Todas as formas de pagamento (menos dinheiro), mesmo as que não tiveram venda: débito, crédito, Pix, vale…
-  const formasCartao = [...new Set([...(loja().formasPagamento || []), ...Object.keys(r.porForma)])].filter((f) => f !== "Dinheiro" && f !== "Convênio");
+  const formasCartao = [...new Set([...(loja().formasPagamento || []), ...Object.keys(r.porForma)])].filter((f) => f !== "Dinheiro" && f !== "Convênio" && f !== "Desconto no salário");
   const s = abrirSheet(`${cabecalhoSheet("Fechar caixa", `Aberto às ${dataHora(cx.abertoEm)}`)}<div class="sh-b">
     <div class="sum"><div><span>Dinheiro que deve ter na gaveta</span><b>${brl(r.esperado)}</b></div></div>
     <label class="f" for="cont">Dinheiro contado na gaveta (R$)</label><input class="in" id="cont" inputmode="decimal" placeholder="0,00">
