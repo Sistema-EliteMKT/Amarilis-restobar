@@ -583,7 +583,7 @@ export function abaAjustes(el) {
         ${campo("fLog", "Rua", f.logradouro)}${campo("fNum", "Número", f.numero)}${campo("fBai", "Bairro", f.bairro)}${campo("fCid", "Cidade", f.cidade)}
         ${campo("fUf", "UF", f.uf, 'maxlength="2"')}${campo("fCep", "CEP", f.cep, 'inputmode="numeric"')}${campo("fMun", "Código IBGE do município", f.cMun, 'inputmode="numeric"')}
         ${campo("fSer", "Série da NFC-e", f.serie ?? 1, 'inputmode="numeric"')}${campo("fPro", "Próximo número", f.proximoNumero ?? 1, 'inputmode="numeric"')}
-        ${campo("fCid2", "ID do CSC (SEFAZ)", f.cscId)}${campo("fCsc", "CSC (código de segurança)", f.csc, 'autocomplete="off"')}</div>
+        ${campo("fCid2", "ID do CSC (opcional: o CSC fica no Focus NFe)", f.cscId)}${campo("fCsc", "CSC (opcional: fica no Focus NFe)", f.csc, 'autocomplete="off"')}</div>
       <label class="opt"><input type="checkbox" id="fCert" ${f.certificadoOk ? "checked" : ""}><span>Já tenho o certificado digital A1 (o arquivo será instalado na hora de ligar a emissão)</span></label>
       <div class="grp">Tributação padrão dos produtos <small>o contador confirma · cada categoria/produto pode ter a sua</small></div>
       <div class="opts dois">${campo("fNcm", "NCM", pd.ncm)}${campo("fCfop", "CFOP", pd.cfop)}${campo("fCso", "CSOSN / CST", pd.csosn)}${campo("fOri", "Origem", pd.origem)}</div>

@@ -1,6 +1,6 @@
 // Regras do negócio: estado ao vivo, totais, comandas, pedidos, pagamentos e cupons de impressão.
 import { store, novoId } from "./store.js";
-import { LOJA_INICIAL, EQUIPE_INICIAL, MARCA } from "./config.js";
+import { LOJA_INICIAL, EQUIPE_INICIAL, MARCA, FISCAL_INICIAL } from "./config.js";
 import { CATEGORIAS, PRODUTOS, BORDAS, TAXAS_ENTREGA, ADICIONAIS } from "./cardapio-inicial.js";
 import { hoje } from "./ui.js";
 import { temInternet } from "./rede.js";
@@ -149,6 +149,14 @@ export const vendeEm = (p, onde) => p.ativo !== false && promoValida(p) && (!ond
 
 // Primeira vez: grava loja, cardápio e equipe iniciais.
 export async function semearSePreciso() {
+  // Uma vez só: cadastro fiscal vazio recebe os dados da empresa (sem ligar a emissão).
+  const fisc = await store.obter("config", "fiscal").catch(() => null);
+  let preencheuFiscal = false;
+  if (!fisc?.cnpj && !fisc?.preenchidoEm) {
+    const lim = Object.fromEntries(Object.entries(fisc || {}).filter(([, v]) => v !== "" && v != null));
+    await store.lote([{ tipo: "salvar", col: "config", id: "fiscal", dados: { ...FISCAL_INICIAL, ...lim, preenchidoEm: Date.now() } }]);
+    preencheuFiscal = true;
+  }
   const atual = await store.obter("config", "loja");
   if (atual) {
     // Uma vez só: a loja já existia sem bairros de entrega. Grava a lista inicial (os bairros da pizzaria).
@@ -157,7 +165,7 @@ export async function semearSePreciso() {
       await store.lote([{ tipo: "salvar", col: "config", id: "loja", dados: { taxasEntrega: TAXAS_ENTREGA, bairrosImportadosEm: Date.now() } }]);
       return "bairros";
     }
-    return false;
+    return preencheuFiscal ? "fiscal" : false;
   }
   const ops = [
     { tipo: "salvar", col: "config", id: "loja", dados: { ...LOJA_INICIAL, bordas: BORDAS, taxasEntrega: TAXAS_ENTREGA, adicionais: ADICIONAIS, criadoEm: Date.now() } },

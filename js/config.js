@@ -83,3 +83,13 @@ export const EQUIPE_INICIAL = [
   { id: "caixa", nome: "Caixa", papel: "caixa", pin: "1111" },
   { id: "garcom1", nome: "Garçom 1", papel: "garcom", pin: "2222" },
 ];
+
+// Dados da empresa para a nota fiscal (NFC-e). São públicos (cartão do CNPJ e saem em toda nota).
+// Gravados uma vez em config/fiscal se o cadastro fiscal estiver vazio; depois, Caixa > Ajustes > Nota fiscal.
+// O CSC, o certificado e o token do Focus NÃO ficam aqui: ficam no Focus NFe e no config.json do caixa.
+export const FISCAL_INICIAL = {
+  ambiente: "homologacao", crt: "1", // 1 = Simples Nacional
+  cnpj: "40646315000206", ie: "187152262119", razaoSocial: "F.R.A COMERCIAL LTDA", fantasia: "Amarílis Restobar",
+  logradouro: "Rua João Pulz", numero: "986", bairro: "Jardim José A. Carneiro", cidade: "Artur Nogueira", uf: "SP", cep: "13161032", cMun: "3503802",
+  serie: 2, proximoNumero: 1, certificadoOk: true, // certificado A1 já está no Focus NFe
+};

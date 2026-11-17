@@ -25,7 +25,6 @@ export function faltaParaEmitir(f = {}) {
   if (!f.razaoSocial) falta.push("Razão social");
   if (!f.ie) falta.push("Inscrição estadual");
   if (!f.cidade || !f.uf || dig(f.cep).length !== 8 || !f.logradouro) falta.push("Endereço da empresa");
-  if (!f.cscId || !f.csc) falta.push("CSC da SEFAZ");
   if (!f.certificadoOk) falta.push("Certificado digital A1");
   return falta;
 }
