@@ -27,7 +27,7 @@ Feito a partir do sistema da Pizzaria Amarílis, com banco de dados próprio (os
 - **Equipe com PIN.** Garçom só vê as mesas; caixa vê o painel; administrador vê também os Ajustes.
 - **Marca Elite.** "Sistema Elite · desenvolvido por Elite MKT" aparece em todas as telas e no fim de cada cupom. A logo da loja aparece em destaque.
 
-> **Nota fiscal (NFC-e): ainda não ligada.** No teste, a loja continua emitindo nota como faz hoje. Veja o fim deste manual.
+> **Nota fiscal (NFC-e): em preparação (homologação).** A loja continua emitindo nota como faz hoje até a produção ser liberada. Veja "Nota fiscal" neste manual.
 
 ---
 
@@ -141,16 +141,26 @@ Nesse modo os cupons saem na **impressora padrão** do Windows, por isso serve p
 - Logo da **Elite MKT**: `assets/elite-logo.png` (original, fundo transparente) e `assets/elite-logo-128.png` (rodapé, login e ícone da aba). Ícones do app: `assets/icon-*.png`.
 - Logo da loja: `assets/logo-cliente.png` (fundo claro) e `assets/logo-cliente-claro.png` (para o fundo vermelho do cardápio).
 
-## Nota fiscal (NFC-e): próximo passo
+## Nota fiscal (NFC-e) pelo Focus NFe
 
-Para emitir NFC-e pelo sistema, a loja precisa de:
+A nota é emitida pelo **agente de impressão** do computador do caixa, que envia a venda ao **Focus NFe** quando o pagamento é registrado e imprime o DANFE com QR code. Começa **desligada**.
 
-1. **Certificado digital A1** (arquivo .pfx) do CNPJ.
-2. **Inscrição estadual** com NFC-e habilitada na SEFAZ-SP e o **CSC** (código de segurança do contribuinte) com o ID.
-3. Do contador, para cada produto: **NCM, CFOP, CST/CSOSN** e o **regime tributário** (Simples Nacional, etc.).
-4. Contratar um **emissor por API** (ex.: Focus NFe, PlugNotas, Nuvem Fiscal). O sistema manda a venda para ele e ele fala com a SEFAZ.
+**Já feito:** empresa F.R.A Comercial (filial 0002-06) cadastrada no Focus, com certificado A1, NFCe ligada, série 2 e CSC (o CSC de SP é por CNPJ base, o mesmo da pizzaria).
 
-O CPF na nota já é guardado no recebimento. A emissão entra no fechamento da conta quando esses itens estiverem prontos.
+**Para ligar em homologação (nota de teste, sem valor fiscal):**
+1. Atualize os arquivos do agente no computador do caixa (sem trocar o `config.json`).
+2. No `config.json`, acrescente o token do Focus (nunca vai para o GitHub):
+   ```json
+   "focus": { "tokenHomologacao": "TOKEN_DE_HOMOLOGACAO_DA_EMPRESA_DO_RESTOBAR", "tokenProducao": "" },
+   "nfce": { "impressora": "imp1" },
+   ```
+   O token está na empresa do restobar no Focus, aba **TOKENS**.
+3. Em **Caixa > Ajustes > Nota fiscal**: preencha CNPJ, razão social, fantasia, inscrição estadual e endereço, marque a emissão automática e salve. O ambiente começa em **Homologação**.
+4. Reinicie o agente (`iniciar.bat`) e receba uma conta de teste: o DANFE sai com "EMITIDA EM HOMOLOGAÇÃO · SEM VALOR FISCAL".
+
+**Para valer de verdade:** só depois dos testes, coloque o `tokenProducao` no `config.json` e troque o ambiente para Produção em Ajustes.
+
+O CPF na nota já é guardado no recebimento. O CSC e o certificado ficam só no Focus.
 
 ## Estrutura
 

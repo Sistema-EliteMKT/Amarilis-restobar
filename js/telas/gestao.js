@@ -135,7 +135,7 @@ function cardCupons(el) {
 }
 
 // Versão do agente de impressão que esta versão do sistema espera (agente-impressao/agente.js).
-const VERSAO_AGENTE = "2026.10.27-6";
+const VERSAO_AGENTE = "2026.11.17-1";
 
 // -------------------------------------------------------------- Freelancers
 export function abaEquipe(el, { usuario, admin }) {
@@ -558,8 +558,8 @@ export function abaAjustes(el) {
     <div class="card inteiro" id="cardCupons"></div>
     <div class="card inteiro" id="cardBairros"></div>
 
-    <div class="card inteiro" id="cardFiscal"><b>Nota fiscal (NFC-e) · preparação</b>
-      <p class="muted pq">A emissão entra na próxima etapa. Já deixamos tudo preparado: cada recebimento guarda os itens com NCM/CFOP/CSOSN, a forma de pagamento no código da nota e o CPF. Preencha com os dados do contador. Esses dados ficam num cadastro só da equipe (o CSC não aparece para o cliente).</p>
+    <div class="card inteiro" id="cardFiscal"><b>Nota fiscal (NFC-e)</b>
+      <p class="muted pq">Emitida pelo Focus NFe, a partir do agente de impressão do caixa. Cada recebimento guarda os itens com NCM/CFOP/CSOSN, a forma de pagamento no código da nota e o CPF. Os dados ficam num cadastro só da equipe.</p>
       <div id="fiscalForm"><p class="muted">Carregando…</p></div></div>
 
   </div>`;
@@ -587,8 +587,24 @@ export function abaAjustes(el) {
       <label class="opt"><input type="checkbox" id="fCert" ${f.certificadoOk ? "checked" : ""}><span>Já tenho o certificado digital A1 (o arquivo será instalado na hora de ligar a emissão)</span></label>
       <div class="grp">Tributação padrão dos produtos <small>o contador confirma · cada categoria/produto pode ter a sua</small></div>
       <div class="opts dois">${campo("fNcm", "NCM", pd.ncm)}${campo("fCfop", "CFOP", pd.cfop)}${campo("fCso", "CSOSN / CST", pd.csosn)}${campo("fOri", "Origem", pd.origem)}</div>
+      <div class="grp">Emissão automática</div>
+      <label class="opt"><input type="checkbox" id="fEmit" ${f.emitir ? "checked" : ""}><span>Emitir a NFC-e quando o pagamento for registrado <small>(o agente de impressão do caixa envia ao Focus NFe e imprime o DANFE com QR code. Vale só para recebimentos feitos depois de ligar. Em "Homologação" a nota é de teste, sem valor fiscal)</small></span></label>
+      ${f.emitir && f.ambiente !== "producao" ? `<p class="muted pq">⚠️ Emissão ligada em <b>HOMOLOGAÇÃO</b>: as notas são de teste. Para valer, troque o ambiente para Produção quando o contador liberar.</p>` : ""}
       <button class="btn pri" id="salvarFiscal">Salvar dados fiscais</button>
-      <p class="muted pq">${D.pagamentos.filter((p) => p.nfce?.status === "pendente").length} recebimento(s) de hoje aguardando nota. Tudo o que for recebido a partir de agora já fica guardado para emitir.</p>`;
+      <div class="grp">Notas de hoje</div>
+      <div id="notasHoje"></div>`;
+    const notas = D.pagamentos.filter((p) => p.nfce && (p.nfce.status !== "pendente" || (f.emitir && p.criadoEm >= (f.emitirDesde || Infinity))));
+    const rot = { pendente: "aguardando", enviando: "enviando…", autorizado: "autorizada ✓", erro: "ERRO", cancelar: "cancelando…", cancelado: "cancelada" };
+    $("#notasHoje", el).innerHTML = notas.sort((a, b) => b.criadoEm - a.criadoEm).map((p) => { const n = p.nfce; return `<div class="cl"><div class="n"><b>${n.numero ? `NFC-e ${esc(n.numero)}` : "Pagamento"} · ${brl(p.total)}</b><small>${esc(rot[n.status] || n.status)}${n.ambiente === "homologacao" ? " · teste" : ""}${n.erro ? ` · ${esc(n.erro)}` : ""}${n.erroCancelamento ? ` · não cancelou: ${esc(n.erroCancelamento)}` : ""}</small></div>
+      <div class="v">${n.status === "erro" ? `<button class="btn ghost sm" data-nre="${esc(p.id)}">Tentar de novo</button>` : ""}${n.status === "autorizado" ? `<button class="btn ghost sm" data-ncx="${esc(p.id)}">Cancelar nota</button>` : ""}</div></div>`; }).join("") || `<p class="vazio">Nenhuma nota hoje.</p>`;
+    $$("[data-nre]", el).forEach((b) => (b.onclick = () => { const p = D.pagamentos.find((x) => x.id === b.dataset.nre); store.salvar("pagamentos", p.id, { nfce: { ...p.nfce, status: "pendente", erro: "", tentativas: 0, proxTentativa: 0 } }).then(() => toast("Vai tentar de novo")).catch(erro); }));
+    $$("[data-ncx]", el).forEach((b) => (b.onclick = () => {
+      const p = D.pagamentos.find((x) => x.id === b.dataset.ncx);
+      const motivo = (prompt("Motivo do cancelamento (mínimo 15 letras):", "Venda cancelada a pedido do cliente") || "").trim();
+      if (!motivo) return;
+      if (motivo.length < 15) return toast("O motivo precisa ter pelo menos 15 letras.");
+      store.salvar("pagamentos", p.id, { nfce: { ...p.nfce, status: "cancelar", cancelarMotivo: motivo, erroCancelamento: "" } }).then(() => toast("Cancelando a nota…")).catch(erro);
+    }));
     $("#salvarFiscal", el).onclick = () => {
       const v = (id) => $("#" + id, el).value.trim(), dig = (id) => v(id).replace(/\D/g, "");
       store.salvar("config", "fiscal", {
@@ -596,6 +612,7 @@ export function abaAjustes(el) {
         logradouro: v("fLog"), numero: v("fNum"), bairro: v("fBai"), cidade: v("fCid"), uf: v("fUf").toUpperCase(), cep: dig("fCep"), cMun: dig("fMun"),
         serie: Number(dig("fSer")) || 1, proximoNumero: Number(dig("fPro")) || 1, cscId: v("fCid2"), csc: v("fCsc"), certificadoOk: $("#fCert", el).checked,
         padrao: { ncm: dig("fNcm"), cfop: dig("fCfop"), csosn: v("fCso"), origem: v("fOri") },
+        emitir: $("#fEmit", el).checked, emitirDesde: $("#fEmit", el).checked ? (f.emitir && f.emitirDesde ? f.emitirDesde : Date.now()) : f.emitirDesde || 0,
       }).then(() => toast("Dados fiscais salvos ✓", "bom")).catch(erro);
     };
   }

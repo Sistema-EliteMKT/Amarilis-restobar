@@ -84,6 +84,13 @@ export function escpos(linhas, imp, acentosPadrao = "sem-acentos") {
   if (esp) b.push(ESC, 0x33, esp);
   for (const l of linhas) {
     if (l.sep) { b.push(...texto("-".repeat(colunas), pagina), 0x0a); continue; }
+    if (l.qr && !bema) { // QR code nativo ESC/POS (GS ( k)
+      const d = Buffer.from(String(l.qr)), n = d.length + 3;
+      b.push(ESC, 0x61, 1, GS, 0x28, 0x6b, 4, 0, 0x31, 0x41, 0x32, 0, GS, 0x28, 0x6b, 3, 0, 0x31, 0x43, 6, GS, 0x28, 0x6b, 3, 0, 0x31, 0x45, 0x31,
+        GS, 0x28, 0x6b, n & 0xff, n >> 8, 0x31, 0x50, 0x30, ...d, GS, 0x28, 0x6b, 3, 0, 0x31, 0x51, 0x30, 0x0a);
+      continue;
+    }
+    if (l.qr) continue;
     b.push(ESC, 0x61, l.c ? 1 : 0); // alinhamento
     b.push(...negrito(l.b), ...grande(l.g));
     const max = l.g && tam === "grande" ? Math.floor(colunas / 2) : colunas; // letra larga ocupa o dobro

@@ -1,6 +1,7 @@
 // Impressão em imagem: desenha o cupom com fonte Arial (igual ao sistema antigo da loja)
 // e manda para a impressora como figura (comando ESC/POS GS v 0). Usado quando a fonte é "arial".
 import { createCanvas, GlobalFonts } from "@napi-rs/canvas";
+import qrcode from "qrcode-generator";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,6 +49,7 @@ export function cupomImagem(linhas, imp) {
   let y = 4;
   for (const l of linhas) {
     if (l.sep) { ops.push({ sep: true, y: y + 6 }); y += 14; continue; }
+    if (l.qr) { const q = qrcode(0, "M"); q.addData(String(l.qr)); q.make(); const n = q.getModuleCount(), m = Math.max(3, Math.floor(Math.min(W - 40, 360) / (n + 8))); ops.push({ qr: q, n, m, y: y + 4 }); y += (n + 8) * m + 8; continue; }
     medidor.font = fonte(l);
     const alt = Math.round((l.g ? destaque : normal) * 1.25 * (MULT[imp.entrelinhas] || 1));
     if (l.d != null) {
@@ -67,6 +69,7 @@ export function cupomImagem(linhas, imp) {
   ctx.fillStyle = "#000"; ctx.textBaseline = "top";
   for (const o of ops) {
     if (o.sep) { for (let x = M; x < W - M; x += 10) ctx.fillRect(x, o.y, 6, 2); continue; }
+    if (o.qr) { const x0 = Math.floor((W - (o.n + 8) * o.m) / 2) + 4 * o.m; for (let r = 0; r < o.n; r++) for (let c = 0; c < o.n; c++) if (o.qr.isDark(r, c)) ctx.fillRect(x0 + c * o.m, o.y + (r + 4) * o.m, o.m, o.m); continue; }
     ctx.font = fonte(o.l);
     // Contorno fino por cima: no papel térmico a Arial fina some; assim a letra sai mais cheia.
     ctx.strokeStyle = "#000"; ctx.lineWidth = o.l.b || o.l.g ? 1 : 0.8;
