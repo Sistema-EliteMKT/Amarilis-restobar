@@ -22,8 +22,8 @@ export function linhasDanfe(pag, nfce, f, homolog) {
     L(`${f.logradouro || ""}, ${f.numero || ""} - ${f.bairro || ""}`, { c: true }),
     L(`${f.cidade || ""}-${f.uf || ""}`, { c: true }),
     { sep: true },
-    L("DANFE NFC-e", { b: true, c: true }),
-    L("Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica", { c: true }),
+    L("CUPOM FISCAL ELETRÔNICO", { b: true, c: true, g: true }),
+    L("DANFE NFC-e - Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica", { c: true }),
     { sep: true },
     ...(pag.itensFiscais || []).map((i) => ({ e: `${i.qtd}x ${i.desc}`, d: brl(i.vTotal), t: `${i.qtd}x ${i.desc}` })),
     { sep: true },
@@ -38,7 +38,7 @@ export function linhasDanfe(pag, nfce, f, homolog) {
     L(`Protocolo ${nfce.protocolo || ""}`, { c: true }),
     L("Chave de acesso", { b: true, c: true }),
     L(chave.replace(/(\d{4})(?=\d)/g, "$1 "), { c: true }),
-    L(pag.cpf ? `Consumidor CPF ${String(pag.cpf).replace(/\D/g, "").replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}` : "CONSUMIDOR NÃO IDENTIFICADO", { c: true }),
+    L((() => { const d = String(pag.cpf || "").replace(/\D/g, ""); return d.length === 11 ? `Consumidor CPF ${d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")}` : d.length === 14 ? `Consumidor CNPJ ${d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")}` : "CONSUMIDOR NÃO IDENTIFICADO"; })(), { c: true }),
     ...(nfce.qrcode ? [{ qr: nfce.qrcode }] : []),
     ...(urlConsulta ? [L("Consulte pela chave de acesso em:", { c: true }), L(urlConsulta, { c: true })] : []),
     L("Obrigado pela preferência!", { c: true }),
@@ -82,7 +82,8 @@ export function iniciarEmissor({ db, cfg, log, aoLimpar }) {
         log(`NFC-e ${r.numero} autorizada (${fx.ambiente}) · pagamento ${id}`);
         await imprimirDanfe(pag, nfce, fx.ambiente !== "producao").catch((e) => log("NFC-e: erro ao imprimir o DANFE:", e.message));
       } else {
-        const msg = r.mensagem_sefaz || r.mensagem || r.codigo || `resposta ${r.http}`;
+        const det = Array.isArray(r.erros) ? r.erros.map((e) => e.mensagem || e.campo).filter(Boolean).join("; ") : "";
+        const msg = [r.mensagem_sefaz || r.mensagem || r.codigo || `resposta ${r.http}`, det].filter(Boolean).join(" · ");
         await salvar(id, { status: "erro", erro: String(msg).slice(0, 300), tentativas: (pag.nfce?.tentativas || 0) + 1, ambiente: fx.ambiente });
         log("NFC-e REJEITADA:", msg);
       }

@@ -1,6 +1,8 @@
 // Emissão de NFC-e pelo Focus NFe. Funções puras (montar o JSON) + chamadas HTTP.
 // O token do Focus fica só no config.json do caixa (nunca no repositório).
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+// Horário de Brasília (sem horário de verão), no formato que a SEFAZ espera.
+const agoraBrasil = () => new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 19) + "-03:00";
 const so = (v) => String(v || "").replace(/\D/g, "");
 
 // Monta o JSON da NFC-e a partir de um documento de "pagamentos" (com itensFiscais e pagamentos).
@@ -9,14 +11,16 @@ export function montarNFCe(pag, fiscal) {
   const itens = pag.itensFiscais || [];
   if (!itens.length) throw new Error("pagamento sem itens fiscais");
   const bruto = r2(itens.reduce((t, i) => t + i.vTotal, 0));
-  const ajuste = r2((pag.servico || 0) - (pag.desconto || 0)); // +serviço −desconto
+  // Tudo o que foi cobrado além dos itens (serviço, taxa de entrega) entra como outras despesas, e o desconto abate:
+  // assim os itens fecham com o total pago (a SEFAZ recusa nota em que os pagamentos passam do total).
+  const ajuste = r2((pag.total != null ? pag.total : bruto + (pag.servico || 0) - (pag.desconto || 0)) - bruto);
   let sobra = ajuste;
   const det = itens.map((i, n) => {
     const ult = n === itens.length - 1;
     const parte = ult ? sobra : r2(bruto ? (ajuste * i.vTotal) / bruto : 0);
     sobra = r2(sobra - parte);
     const it = {
-      numero_item: n + 1, codigo_produto: String(i.cod || n + 1), descricao: String(i.desc).slice(0, 120),
+      numero_item: n + 1, codigo_produto: String(i.cod || n + 1).slice(0, 60), descricao: String(i.desc).slice(0, 120),
       codigo_ncm: so(i.ncm) || "19059090", cfop: so(i.cfop) || "5102",
       unidade_comercial: i.unidade || "UN", quantidade_comercial: i.qtd, valor_unitario_comercial: r2(i.vUnit),
       unidade_tributavel: i.unidade || "UN", quantidade_tributavel: i.qtd, valor_unitario_tributavel: r2(i.vUnit),
@@ -37,11 +41,13 @@ export function montarNFCe(pag, fiscal) {
     return f;
   }).filter((f) => f.valor_pagamento > 0);
   const nota = {
-    natureza_operacao: "Venda ao Consumidor", data_emissao: new Date(pag.criadoEm || Date.now()).toISOString().replace(/\.\d+Z$/, "-00:00"),
+    natureza_operacao: "Venda ao Consumidor", data_emissao: agoraBrasil(), // hora do envio: a SEFAZ recusa nota com horário de emissão atrasado
     presenca_comprador: 1, modalidade_frete: 9, local_destino: 1, consumidor_final: 1,
     cnpj_emitente: so(fiscal.cnpj), itens: det, formas_pagamento: formas,
   };
-  if (so(pag.cpf).length === 11) nota.cpf_destinatario = so(pag.cpf);
+  const doc = so(pag.cpf); // o campo "cpf" do pagamento aceita CPF (11) ou CNPJ (14)
+  if (doc.length === 11) nota.cpf_destinatario = doc;
+  else if (doc.length === 14) nota.cnpj_destinatario = doc;
   return nota;
 }
 
