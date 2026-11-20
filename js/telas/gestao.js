@@ -592,8 +592,35 @@ export function abaAjustes(el) {
       ${f.emitir && f.ambiente !== "producao" ? `<p class="muted pq">⚠️ Emissão ligada em <b>HOMOLOGAÇÃO</b>: as notas são de teste. Para valer, troque o ambiente para Produção quando o contador liberar.</p>` : ""}
       <button class="btn pri" id="salvarFiscal">Salvar dados fiscais</button>
       <div class="grp">Notas de hoje</div>
+      <div id="notasResumo"></div>
       <div id="notasHoje"></div>`;
     const notas = D.pagamentos.filter((p) => p.nfce && p.nfce.status !== "nenhuma" && (p.nfce.status !== "pendente" || (f.emitir && p.criadoEm >= (f.emitirDesde || Infinity))));
+    // Soma automática do dia: cupons autorizados (quantidade e valor) e por forma de pagamento (o troco sai do dinheiro).
+    const autor = notas.filter((p) => p.nfce.status === "autorizado");
+    const por = {};
+    for (const p of autor) {
+      let troco = Number(p.troco) || 0;
+      for (const x of p.pagamentos || []) {
+        let v = Number(x.valor) || 0;
+        if (x.forma === "Dinheiro" && troco > 0) { const t = Math.min(troco, v); v -= t; troco -= t; }
+        const a = (por[x.forma] ||= { qtd: 0, valor: 0 });
+        a.qtd++; a.valor += v;
+      }
+    }
+    const soma = (l) => l.reduce((t, p) => t + (Number(p.total) || 0), 0);
+    const cont = (st) => notas.filter((p) => p.nfce.status === st);
+    const semNota = D.pagamentos.filter((p) => !p.nfce || p.nfce.status === "nenhuma");
+    const linha = (nome, qtd, valor, extra = "") => `<div class="cl"><div class="n"><b>${esc(nome)}</b>${extra ? `<small>${extra}</small>` : ""}</div><div class="v">${qtd} · ${brl(valor)}</div></div>`;
+    const aguard = notas.filter((p) => ["pendente", "enviando", "cancelar"].includes(p.nfce.status));
+    $("#notasResumo", el).innerHTML = `<div class="resumo-notas">
+      ${linha("Cupons emitidos (autorizados)", `${autor.length} ${autor.length === 1 ? "cupom" : "cupons"}`, soma(autor))}
+      ${Object.entries(por).sort((a, b) => b[1].valor - a[1].valor).map(([forma, a]) => linha(`↳ ${forma}`, `${a.qtd} ${a.qtd === 1 ? "cupom" : "cupons"}`, a.valor)).join("")}
+      ${Object.keys(por).length > 1 ? `<small class="muted pq">Conta paga em duas formas entra nas duas linhas (a soma das formas = total dos cupons).</small>` : ""}
+      ${aguard.length ? linha("Aguardando / enviando", aguard.length, soma(aguard)) : ""}
+      ${cont("erro").length ? linha("Com ERRO (tentar de novo)", cont("erro").length, soma(cont("erro")), "Clique em \"Tentar de novo\" abaixo") : ""}
+      ${cont("cancelado").length ? linha("Canceladas", cont("cancelado").length, soma(cont("cancelado"))) : ""}
+      ${linha("Vendas de hoje SEM cupom", semNota.length, soma(semNota), "Escolheram \"Não emitir\"")}
+    </div>`;
     const rot = { pendente: "aguardando", enviando: "enviando…", autorizado: "autorizada ✓", erro: "ERRO", cancelar: "cancelando…", cancelado: "cancelada" };
     $("#notasHoje", el).innerHTML = notas.sort((a, b) => b.criadoEm - a.criadoEm).map((p) => { const n = p.nfce; return `<div class="cl"><div class="n"><b>${n.numero ? `NFC-e ${esc(n.numero)}` : "Pagamento"} · ${brl(p.total)}</b><small>${esc(rot[n.status] || n.status)}${n.ambiente === "homologacao" ? " · teste" : ""}${n.erro ? ` · ${esc(n.erro)}` : ""}${n.erroCancelamento ? ` · não cancelou: ${esc(n.erroCancelamento)}` : ""}</small></div>
       <div class="v">${n.status === "erro" ? `<button class="btn ghost sm" data-nre="${esc(p.id)}">Tentar de novo</button>` : ""}${n.status === "autorizado" ? `<button class="btn ghost sm" data-ncx="${esc(p.id)}">Cancelar nota</button>` : ""}</div></div>`; }).join("") || `<p class="vazio">Nenhuma nota hoje.</p>`;
