@@ -135,7 +135,7 @@ function cardCupons(el) {
 }
 
 // Versão do agente de impressão que esta versão do sistema espera (agente-impressao/agente.js).
-const VERSAO_AGENTE = "2026.11.20-2";
+const VERSAO_AGENTE = "2026.11.20-3";
 
 // -------------------------------------------------------------- Freelancers
 export function abaEquipe(el, { usuario, admin }) {

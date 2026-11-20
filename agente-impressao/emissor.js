@@ -78,11 +78,6 @@ export function iniciarEmissor({ db, cfg, log, aoLimpar }) {
       const nota = montarNFCe(pag, fiscal);
       const aguardar = async (r) => { for (let i = 0; i < 12 && (r.status === "processando_autorizacao" || (r.http === 201 && !r.status)); i++) { await espera(3000); r = await fx.consultar(id); } return r; };
       let r = await aguardar(await fx.enviar(id, nota));
-      // Se o Focus recusar o formulário (schema), tenta de novo em formato mais simples (sem o campo extra do cartão).
-      if (r.status !== "autorizado" && /schema/i.test(JSON.stringify(r))) {
-        log("NFC-e: formulário recusado, tentando de novo em formato simples:", JSON.stringify(r.erros || r.mensagem || "").slice(0, 300));
-        r = await aguardar(await fx.enviar(id, montarNFCe(pag, fiscal, { semGrupoCartao: true })));
-      }
       if (r.status === "autorizado") {
         const nfce = { status: "autorizado", ambiente: fx.ambiente, chave: r.chave_nfe, numero: r.numero, serie: r.serie, protocolo: r.protocolo, qrcode: r.qrcode_url, urlConsulta: r.url_consulta_nf,
           danfe: r.caminho_danfe ? fx.base + r.caminho_danfe : "", xml: r.caminho_xml_nota_fiscal ? fx.base + r.caminho_xml_nota_fiscal : "", emitidaEm: Date.now(), agente: true };
