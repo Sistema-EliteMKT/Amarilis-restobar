@@ -162,6 +162,8 @@ export function editarLancado(pedido, item, quem, onde, aoFim = () => {}) {
   const des = () => {
     const s = abrirSheet(`${cabecalhoSheet("Alterar item", loja().imprimirAlteracao === true ? "Já foi para a produção: se mudar o pedido, sai um papel ALTERADO no setor" : "A mudança fica registrada no sistema (não imprime papel novo)")}<div class="sh-b">
       <div class="cl"><div class="n"><b>${esc(rasc.nome)}</b>${(rasc.det || []).map((d) => `<small>${esc(d)}</small>`).join("")}${rasc.obs ? `<small class="obs">Obs: ${esc(rasc.obs)}</small>` : ""}</div></div>
+      <label class="f" for="nm">Nome do item <small class="muted">(para lançar algo que não tem cadastro, troque o nome e o valor)</small></label>
+      <input class="in" id="nm" maxlength="80" value="${esc(rasc.nome)}" autocomplete="off">
       <button class="btn sec cheio" id="esc">Mudar sabores, borda, adicionais ou observação</button>
       <div class="opts dois"><div><label class="f">Quantidade</label><div class="qtd"><button id="qm" aria-label="Diminuir">−</button><span id="qv">${rasc.qtd}</span><button id="qp" aria-label="Aumentar">+</button></div></div>
         <div><label class="f" for="vu">Valor de cada (R$)</label><input class="in" id="vu" inputmode="decimal" value="${valorCampo(rasc.unit)}"></div></div>
@@ -169,10 +171,11 @@ export function editarLancado(pedido, item, quem, onde, aoFim = () => {}) {
       <div class="sum"><div class="t"><span>Total do item</span><span id="tot">${brl(rasc.unit * rasc.qtd)}</span></div></div>
       <div class="err" id="err"></div>
       <button class="btn ok cheio grande" id="ok">Salvar alteração</button></div>`, { nivel: 2 });
-    const tot = () => { rasc.unit = numero($("#vu", s).value); $("#qv", s).textContent = rasc.qtd; $("#tot", s).textContent = brl(rasc.unit * rasc.qtd); };
+    const tot = () => { rasc.nome = $("#nm", s).value.trim() || rasc.nome; rasc.unit = numero($("#vu", s).value); $("#qv", s).textContent = rasc.qtd; $("#tot", s).textContent = brl(rasc.unit * rasc.qtd); };
     $("#qm", s).onclick = () => { if (rasc.qtd > 1) { rasc.qtd--; tot(); } };
     $("#qp", s).onclick = () => { rasc.qtd++; tot(); };
     $("#vu", s).oninput = tot;
+    $("#nm", s).oninput = tot;
     $("#esc", s).onclick = () => {
       tot();
       editarItem(rasc, onde, (novo) => { rasc = { ...rasc, ...novo }; des(); });
@@ -180,6 +183,7 @@ export function editarLancado(pedido, item, quem, onde, aoFim = () => {}) {
     $("#ok", s).onclick = async (ev) => {
       tot();
       if (!(rasc.unit >= 0)) return ($("#err", s).textContent = "Valor inválido.");
+      if (!$("#nm", s).value.trim()) return ($("#err", s).textContent = "Escreva o nome do item.");
       ev.currentTarget.disabled = true;
       try {
         const { produtoId, setor, qtd, unit, nome, det, obs, escolhas } = rasc;
