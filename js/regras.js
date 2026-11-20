@@ -62,6 +62,8 @@ export function conectar({ publico = false } = {}) {
   if (publico) return;
   const dia = hoje();
   desligar.push(
+    // Cadastro fiscal (1 documento): também no celular do garçom, que fecha conta e pergunta se emite o cupom.
+    store.ouvirDoc("config", "fiscal", (d) => { D.fiscal = d; avisar(); }),
     store.ouvir("usuarios", (docs) => { D.usuarios = docs.sort((a, b) => a.nome.localeCompare(b.nome)); avisar(); }),
     store.ouvir("pedidos", (docs) => { D.abertos = docs; avisar(); }, ["aberto", "==", true]),
   );
@@ -75,7 +77,6 @@ export function conectar({ publico = false } = {}) {
 // O que só o caixa/administrador usa: relatórios, fila de impressão, caixa aberto, equipe de motoboys…
 function ligarPesados(dia) {
   desligarPesados = [
-    store.ouvirDoc("config", "fiscal", (d) => { D.fiscal = d; avisar(); }),
     store.ouvir("motoboys", (docs) => { D.motoboys = docs.sort((a, b) => a.nome.localeCompare(b.nome)); avisar(); }),
     store.ouvir("pedidos", (docs) => { D.doDia = docs; avisar(); }, ["dia", "==", dia]),
     store.ouvir("impressoes", (docs) => { D.impressoes = docs.sort((a, b) => b.criadoEm - a.criadoEm); avisar(); }, ["dia", "==", dia]),
@@ -461,7 +462,7 @@ export async function registrarPagamento(pedidos, valores, quem) {
     pagamentos: valores.pagamentos.filter((x) => Number(x.valor) > 0).map((x) => ({ forma: x.forma, valor: dinheiro(x.valor), tPag: tPagDe(x.forma), ...(x.forma === FORMA_CONVENIO ? { funcionario: x.func || "" } : {}) })),
     troco, cpf: valores.cpf || "", caixa: D.caixa?.id || null,
     // Dados para a nota fiscal (NFC-e), que será emitida depois a partir daqui.
-    nfce: { status: "pendente" }, itensFiscais: itensFiscais(pedidos),
+    nfce: { status: valores.emitirNota === false ? "nenhuma" : "pendente" }, itensFiscais: itensFiscais(pedidos),
   };
   // Comanda paga fecha na hora; pedido de entrega/retirada continua aberto até ser concluído.
   const fim = (p) => (p.tipo === "mesa" ? { status: "fechada", aberto: false } : {});
@@ -1128,7 +1129,7 @@ export function cupomRecibo(pedidos, pag, via = "VIA DA LOJA") {
   linhas.push(L(lado("TOTAL PAGO R$", r$(pag.total)), { b: true, g: true }), SEP,
     L(`Declaro que paguei o valor de R$ ${r$(pag.total)} referente ao consumo acima.`),
     L(""), L(""), L("______________________________", { c: true }), L("Assinatura do cliente", { c: true }), L(""),
-    L("Nome: ______________________________"), L(pag.cpf ? `CPF: ${pag.cpf}` : "CPF: ______________________________"), ...(pag.por ? [L(`Recebido por: ${pag.por}`)] : []),
+    L("Nome: ______________________________"), L(pag.cpf ? `${String(pag.cpf).length === 14 ? "CNPJ" : "CPF"}: ${pag.cpf}` : "CPF: ______________________________"), ...(pag.por ? [L(`Recebido por: ${pag.por}`)] : []),
     SEP, L("NÃO É DOCUMENTO FISCAL", { c: true }), ...rodape());
   return linhas;
 }

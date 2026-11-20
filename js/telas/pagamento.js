@@ -1,4 +1,5 @@
 // Janela de receber pagamento (fecha mesa ou pedido). Aceita dividir em várias formas.
+import { store } from "../store.js";
 import { $, $$, esc, brl, numero, valorCampo, toast, erro, avisoDesfazer, abrirSheet, fecharSheet, cabecalhoSheet } from "../ui.js";
 import { D, loja, totalPedido, registrarPagamento, dinheiro, imprimirComprovante, imprimirRecibo, baseServico, desfazerPagamento, FORMA_CONVENIO } from "../regras.js";
 
@@ -23,7 +24,7 @@ export function receber(pedidos, quem, { servico = 0, forma = "", titulo = "Rece
       <div id="formas"></div>
       <button class="btn ghost sm" id="maisForma">+ Outra forma</button>
       <div class="dividir"><span class="muted">Dividir igual por</span>${[2, 3, 4, 5, 6].map((n) => `<button class="chip" data-div="${n}">${n}</button>`).join("")}<span id="divTxt" class="muted"></span></div>
-      <label class="f" for="cpf">CPF na nota (opcional)</label><input class="in" id="cpf" inputmode="numeric" placeholder="Só números">
+      <label class="f" for="cpf">CPF ou CNPJ na nota (opcional)</label><input class="in" id="cpf" inputmode="numeric" placeholder="Só números: CPF (11) ou CNPJ (14)">
       <div class="sum" id="sum"></div>
       <label class="opt"><input type="checkbox" id="comp"><span>Imprimir comprovante</span></label>
       <label class="opt"><input type="checkbox" id="rec"><span>Imprimir recibo para o cliente assinar <small>(a loja guarda)</small></span></label>
@@ -66,21 +67,52 @@ export function receber(pedidos, quem, { servico = 0, forma = "", titulo = "Rece
       const btn = ev.currentTarget;
       btn.disabled = true;
       try {
+        const doc = $("#cpf", s).value.replace(/\D/g, "");
+        if (doc && doc.length !== 11 && doc.length !== 14) throw new Error("CPF tem 11 números e CNPJ tem 14. Confira ou deixe em branco.");
         const pag = await registrarPagamento(pedidos, {
           servico: valorServ(), desconto: numero($("#desc", s).value),
-          pagamentos: linhas, cpf: $("#cpf", s).value.replace(/\D/g, ""),
+          pagamentos: linhas, cpf: $("#cpf", s).value.replace(/\D/g, ""), emitirNota: false, // a pergunta do cupom fiscal vem depois de fechar a conta
         }, quem);
         if ($("#comp", s).checked) await imprimirComprovante(pedidos, pag, { salao });
         if ($("#rec", s).checked) await imprimirRecibo(pedidos, pag, { salao });
         toast(pag.troco ? `Recebido. Troco: ${brl(pag.troco)}` : "Recebido ✓", "bom");
         fecharSheet();
-        // Fechou por engano? Por alguns segundos dá para desfazer (a mesa volta a ficar aberta).
-        avisoDesfazer("Conta recebida e fechada.", () => desfazerPagamento(pag, quem).then(() => toast("Recebimento desfeito. A mesa voltou a ficar aberta.", "bom")).catch(erro));
+        // Conta fechada. Com a nota fiscal ligada, sempre pergunta se emite o cupom fiscal desta venda.
+        const emitiu = D.fiscal?.emitir ? await perguntarNota(pag) : false;
+        // Fechou por engano? Por alguns segundos dá para desfazer (a mesa volta a ficar aberta). Com cupom emitido não dá.
+        if (!emitiu) avisoDesfazer("Conta recebida e fechada.", () => desfazerPagamento(pag, quem).then(() => toast("Recebimento desfeito. A mesa voltou a ficar aberta.", "bom")).catch(erro));
         res(pag);
       } catch (e) { $("#err", s).textContent = e.message; btn.disabled = false; }
     };
     completar();
     // Cliente avisou "troco para R$ X": já deixa o valor entregue preenchido.
     if (recebido > total()) { linhas[0].valor = dinheiro(recebido); desenharFormas(); resumo(); }
+  });
+}
+
+// Segunda tela, depois de fechar a conta: emitir ou não o cupom fiscal eletrônico (NFC-e) desta venda.
+// Fechar a janela de qualquer jeito (X, tocar fora, Esc) conta como "Não emitir", para nada ficar esperando.
+function perguntarNota(pag) {
+  const teste = D.fiscal?.ambiente !== "producao";
+  return new Promise((res) => {
+    const s = abrirSheet(`${cabecalhoSheet("Cupom fiscal", `Conta recebida · ${brl(pag.total)}`)}<div class="sh-b" id="perguntaNota">
+      <p>Emitir o <b>cupom fiscal eletrônico</b> desta venda?</p>
+      ${teste ? `<p class="ruim-txt pq">⚠️ Modo TESTE: a nota não tem valor fiscal.</p>` : ""}
+      ${pag.cpf ? `<p class="muted pq">${String(pag.cpf).length === 14 ? "CNPJ" : "CPF"} na nota: ${esc(pag.cpf)}</p>` : ""}
+      <div class="err" id="err"></div>
+      <div class="linha-btn"><button class="btn sec" data-r="0">Não emitir</button><button class="btn pri" data-r="1">Emitir cupom fiscal</button></div></div>`);
+    const marca = $("#perguntaNota", s);
+    let feito = false;
+    const fim = (v, fechar = true) => { if (feito) return; feito = true; vigia.disconnect(); if (fechar) fecharSheet(); res(v); };
+    const vigia = new MutationObserver(() => { if (!s.classList.contains("on") || !s.contains(marca)) fim(false, false); });
+    vigia.observe(s, { attributes: true, attributeFilter: ["class"], childList: true });
+    $(".x", s).onclick = () => fim(false);
+    $('[data-r="0"]', s).onclick = () => fim(false);
+    $('[data-r="1"]', s).onclick = async (ev) => {
+      const b = ev.currentTarget;
+      b.disabled = true;
+      try { await store.salvar("pagamentos", pag.id, { nfce: { status: "pendente" } }); toast("Cupom fiscal na fila ✓", "bom"); fim(true); }
+      catch (e) { $("#err", s).textContent = e.message; b.disabled = false; }
+    };
   });
 }
