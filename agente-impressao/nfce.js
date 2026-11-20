@@ -38,11 +38,13 @@ export function montarNFCe(pag, fiscal) {
     if (x.forma === "Dinheiro" && troco > 0) { const t = Math.min(troco, v); v = r2(v - t); troco = r2(troco - t); }
     const f = { forma_pagamento: x.tPag || "99", valor_pagamento: v };
     if (f.forma_pagamento === "99") f.descricao_pagamento = String(x.forma || "Outros").slice(0, 60);
+    // Cartão e Pix pedem o grupo do cartão: "2" = maquininha/Pix fora do sistema (sem isso a SEFAZ recusa: rejeição 391).
+    if (["03", "04", "17"].includes(f.forma_pagamento)) f.tipo_integracao = 2;
     return f;
   }).filter((f) => f.valor_pagamento > 0);
   const nota = {
     natureza_operacao: "Venda ao Consumidor", data_emissao: agoraBrasil(), // hora do envio: a SEFAZ recusa nota com horário de emissão atrasado
-    presenca_comprador: 1, modalidade_frete: 9, local_destino: 1, consumidor_final: 1,
+    presenca_comprador: pag.tipo === "entrega" ? 4 : 1, // 4 = entrega a domicílio modalidade_frete: 9, local_destino: 1, consumidor_final: 1,
     cnpj_emitente: so(fiscal.cnpj), itens: det, formas_pagamento: formas,
   };
   const doc = so(pag.cpf); // o campo "cpf" do pagamento aceita CPF (11) ou CNPJ (14)

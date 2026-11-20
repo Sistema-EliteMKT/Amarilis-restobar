@@ -13,7 +13,9 @@ export function linhasDanfe(pag, nfce, f, homolog) {
   const L = (t, o = {}) => ({ t, ...o });
   const chave = String(nfce.chave || "").replace(/^NFe/, "");
   const urlConsulta = nfce.urlConsulta || "";
-  const total = (pag.itensFiscais || []).reduce((t, i) => t + i.vTotal, 0) + (pag.servico || 0) - (pag.desconto || 0);
+  const bruto = (pag.itensFiscais || []).reduce((t, i) => t + i.vTotal, 0);
+  const total = pag.total != null ? pag.total : bruto + (pag.servico || 0) - (pag.desconto || 0);
+  const extra = Math.round((total - bruto - (pag.servico || 0) + (pag.desconto || 0)) * 100) / 100; // taxa de entrega / desconto do cupom
   return [
     ...(homolog ? [L("** EMITIDA EM HOMOLOGAÇÃO **", { b: true, c: true }), L("SEM VALOR FISCAL", { b: true, c: true }), { sep: true }] : []),
     L(f.fantasia || f.razaoSocial || "", { b: true, c: true, g: true }),
@@ -29,6 +31,7 @@ export function linhasDanfe(pag, nfce, f, homolog) {
     { sep: true },
     ...(pag.servico ? [{ e: "Serviço", d: brl(pag.servico), t: "Serviço" }] : []),
     ...(pag.desconto ? [{ e: "Desconto", d: `-${brl(pag.desconto)}`, t: "Desconto" }] : []),
+    ...(extra > 0 ? [{ e: "Entrega e ajustes", d: brl(extra), t: "Entrega e ajustes" }] : extra < 0 ? [{ e: "Desconto", d: `-${brl(-extra)}`, t: "Desconto" }] : []),
     { e: "TOTAL R$", d: brl(total), b: true, t: "TOTAL" },
     ...(pag.pagamentos || []).map((x) => ({ e: x.forma, d: brl(x.valor), t: x.forma })),
     ...(pag.troco ? [{ e: "Troco", d: brl(pag.troco), t: "Troco" }] : []),
